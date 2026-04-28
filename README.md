@@ -86,11 +86,17 @@ flexibility and `docker exec` debugging).
 | ------------------------------------------ | --------: |
 | `alpine:3.20` base                         |    ~7 MB  |
 | `ca-certificates` + `tini`                 |    ~1 MB  |
-| plugin binary (stripped, LTO, musl-static) | ~5–10 MB  |
-| hc-core binary (stripped, LTO, musl-static)| ~10–15 MB |
+| plugin binary (stripped, LTO, musl-static) | ~25–30 MB |
+| hc-core binary (stripped, LTO, musl-static)| ~30–40 MB |
 | Leptos WASM `dist/` (release)              |  ~1–2 MB  |
 
-Targets: **plugin image ~13–18 MB**, **core image ~19–25 MB** compressed.
+Targets: **plugin image ~30–40 MB**, **core image ~40–55 MB** compressed.
+
+*(Measured: hc-hue@dev-a943e83 is **35.4 MB** multi-arch on ghcr.io.
+Rust binaries with reqwest + tokio + tracing + rustls + flate2 land
+heavier than a naive estimate suggests — the `[profile.release]`
+strip + thin LTO already extract most of what's available without
+reaching for UPX or distroless.)*
 
 ### Biggest lever: Cargo release profile
 
