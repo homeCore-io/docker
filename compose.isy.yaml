@@ -1,0 +1,16 @@
+# Universal Devices ISY (994 / Polisy / eisy) plugin.
+# Uncomment under `include:` in compose.yaml to enable.
+#
+# Setup:
+#   First boot creates ./config/hc-isy/config.toml. Set the ISY IP +
+#   credentials.
+services:
+  hc-isy:
+    image: ghcr.io/homecore-io/hc-isy:0.1.0
+    container_name: hc-isy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-isy:/etc/homecore

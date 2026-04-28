@@ -1,0 +1,42 @@
+# =============================================================================
+# homeCore — multi-container compose
+#
+# This is the BASE file. It runs only hc-core (with the embedded MQTT broker).
+# Add plugins by uncommenting them in the `include:` block below.
+#
+# Quick start:
+#   1. Uncomment the plugins you want under `include:`.
+#   2. docker compose up -d
+#   3. First boot creates ./config/homecore/config.toml. Edit it.
+#   4. docker compose restart
+#
+# Web UI:    http://localhost:8080
+# Broker:    127.0.0.1:1883 (host network — plugins reach it directly)
+#
+# All services use `network_mode: host` — required for mDNS/SSDP discovery
+# and for IoT devices on the LAN to reach the embedded broker.
+# =============================================================================
+
+include:
+  # - compose.hue.yaml
+  # - compose.sonos.yaml
+  # - compose.yolink.yaml
+  # - compose.lutron.yaml
+  # - compose.wled.yaml
+  # - compose.isy.yaml
+  # - compose.zwave.yaml
+  # - compose.caseta.yaml
+  # - compose.thermostat.yaml
+  # - compose.ecowitt.yaml
+
+services:
+  homecore:
+    image: ghcr.io/homecore-io/hc-core:0.1.0
+    container_name: homecore
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/homecore:/etc/homecore
+      - ./data/homecore:/var/lib/homecore

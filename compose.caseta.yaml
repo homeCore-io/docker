@@ -1,0 +1,18 @@
+# Lutron Caseta plugin. Uncomment under `include:` in compose.yaml to
+# enable. (For HomeWorks/RA2, use compose.lutron.yaml instead.)
+#
+# Setup:
+#   First boot creates ./config/hc-caseta/config.toml. Caseta Smart Bridge
+#   Pro discovery uses mDNS — host networking required. You also need
+#   the bridge cert + key files that the LEAP pairing flow produces; see
+#   the hc-caseta README for the pairing helper.
+services:
+  hc-caseta:
+    image: ghcr.io/homecore-io/hc-caseta:0.1.0
+    container_name: hc-caseta
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-caseta:/etc/homecore

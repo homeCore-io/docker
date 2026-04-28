@@ -1,0 +1,42 @@
+# homeCore core image (hc-core + embedded broker + Leptos web UI bundle).
+#
+# Designed to be built by homeCore-io/homeCore's release.yml AFTER the
+# musl binary AND the WASM UI bundle have been produced. The build
+# context is expected to contain:
+#
+#   ./homecore                — prebuilt static musl binary (hc-core)
+#   ./ui/                     — Leptos `dist/` from `trunk build --release`
+#   ./config.toml.example     — default config (homecore.toml.example)
+#   ./entrypoint-core.sh      — fetched from the homeCore-io/docker repo
+#
+# Example invocation (from homeCore's release.yml, with the binary +
+# WASM bundle staged into ./build-context/):
+#
+#   docker buildx build \
+#       --platform linux/amd64,linux/arm64 \
+#       --tag ghcr.io/homecore-io/hc-core:0.1.0 \
+#       --push \
+#       ./build-context
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tini
+
+COPY homecore                /usr/local/bin/homecore
+COPY ui/                     /opt/homecore/ui/
+COPY config.toml.example     /opt/homecore/defaults/config.toml
+COPY entrypoint-core.sh      /entrypoint.sh
+
+RUN chmod +x /usr/local/bin/homecore /entrypoint.sh
+
+# Default config locations (entrypoint seeds these on first boot).
+ENV HC_CONFIG=/etc/homecore/config.toml
+ENV HC_UI_DIR=/opt/homecore/ui
+ENV HC_DATA_DIR=/var/lib/homecore
+
+# Embedded broker on 1883, web UI / API on 8080.
+EXPOSE 1883 8080
+
+VOLUME ["/etc/homecore", "/var/lib/homecore"]
+
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]

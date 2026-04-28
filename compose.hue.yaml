@@ -1,0 +1,16 @@
+# Philips Hue plugin. Uncomment under `include:` in compose.yaml to enable.
+#
+# Setup:
+#   First boot creates ./config/hc-hue/config.toml. Edit it to set your
+#   Hue bridge IP + API key. Bridge discovery uses mDNS — host networking
+#   is required.
+services:
+  hc-hue:
+    image: ghcr.io/homecore-io/hc-hue:0.1.0
+    container_name: hc-hue
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-hue:/etc/homecore

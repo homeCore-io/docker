@@ -1,0 +1,16 @@
+# Lutron HomeWorks / RadioRA2 plugin. Uncomment under `include:` in
+# compose.yaml to enable. (For Caseta, use compose.caseta.yaml instead.)
+#
+# Setup:
+#   First boot creates ./config/hc-lutron/config.toml. Set the processor
+#   IP, telnet credentials, and mode (homeworks vs ra2).
+services:
+  hc-lutron:
+    image: ghcr.io/homecore-io/hc-lutron:0.1.0
+    container_name: hc-lutron
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-lutron:/etc/homecore

@@ -1,0 +1,15 @@
+# WLED plugin. Uncomment under `include:` in compose.yaml to enable.
+#
+# Setup:
+#   First boot creates ./config/hc-wled/config.toml. WLED controllers
+#   are discovered via mDNS — host networking required.
+services:
+  hc-wled:
+    image: ghcr.io/homecore-io/hc-wled:0.1.0
+    container_name: hc-wled
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-wled:/etc/homecore

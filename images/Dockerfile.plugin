@@ -1,0 +1,44 @@
+# Generic homeCore plugin image.
+#
+# Designed to be built by each plugin's release.yml AFTER the musl binary
+# has been produced. The build context is expected to contain:
+#
+#   ./<binary_name>           — prebuilt static musl binary
+#   ./config.toml.example     — default config (fetched from the plugin repo)
+#   ./entrypoint-plugin.sh    — fetched from the homeCore-io/docker repo
+#
+# Build args:
+#   BINARY_NAME   — e.g. "hc-hue", "hc-sonos". Image tag should match.
+#
+# Example invocation (from a plugin's release.yml, with binaries already
+# downloaded into ./build-context/):
+#
+#   docker buildx build \
+#       --platform linux/amd64,linux/arm64 \
+#       --build-arg BINARY_NAME=hc-hue \
+#       --tag ghcr.io/homecore-io/hc-hue:0.1.0 \
+#       --push \
+#       ./build-context
+
+ARG BINARY_NAME
+
+FROM alpine:3.20
+
+ARG BINARY_NAME
+
+# ca-certificates for outbound HTTPS (cloud APIs, OAuth, etc.).
+# tini for proper PID-1 signal handling under `docker stop`.
+RUN apk add --no-cache ca-certificates tini
+
+COPY ${BINARY_NAME}              /usr/local/bin/${BINARY_NAME}
+COPY config.toml.example         /opt/homecore/defaults/config.toml
+COPY entrypoint-plugin.sh        /entrypoint.sh
+
+RUN chmod +x /usr/local/bin/${BINARY_NAME} /entrypoint.sh
+
+# Bake the binary name in so the entrypoint can find it.
+ENV BINARY_NAME=${BINARY_NAME}
+
+VOLUME ["/etc/homecore"]
+
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]

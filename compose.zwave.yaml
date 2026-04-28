@@ -1,0 +1,18 @@
+# Z-Wave plugin (driven by zwave-js-server). Uncomment under `include:`
+# in compose.yaml to enable.
+#
+# Setup:
+#   You need zwave-js-server running somewhere reachable on the LAN
+#   (the official docker image is `zwavejs/zwave-js-ui`). First boot
+#   creates ./config/hc-zwave/config.toml — set the ws_url to point at
+#   your zwave-js-server.
+services:
+  hc-zwave:
+    image: ghcr.io/homecore-io/hc-zwave:0.1.0
+    container_name: hc-zwave
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./config/hc-zwave:/etc/homecore
