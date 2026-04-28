@@ -2,11 +2,13 @@
 # (hc-core + embedded broker + Leptos web UI bundle)
 #
 # Designed to be built by homeCore-io/homeCore's release.yml AFTER the
-# musl binary AND the WASM UI bundle have been produced. The build
-# context is expected to contain:
+# per-arch musl binaries AND the WASM UI bundle have been produced.
+# The build context is expected to contain:
 #
-#   ./homecore                — prebuilt static musl binary (hc-core)
+#   ./homecore-amd64          — prebuilt x86_64 static musl binary
+#   ./homecore-arm64          — prebuilt aarch64 static musl binary
 #   ./ui/                     — Leptos `dist/` from `trunk build --release`
+#                               (single bundle — WASM is arch-independent)
 #   ./config.toml.example     — default config (homecore.toml.example)
 #   ./entrypoint-core.sh      — fetched from the homeCore-io/docker repo
 #
@@ -35,11 +37,13 @@
 
 FROM alpine:3.20
 
+ARG TARGETARCH
+
 # ca-certificates: outbound HTTPS for plugins/notifications.
 # tini: PID-1 signal handling + zombie reaping under `docker stop`.
 RUN apk add --no-cache ca-certificates tini
 
-COPY homecore                /usr/local/bin/homecore
+COPY homecore-${TARGETARCH}  /usr/local/bin/homecore
 COPY ui/                     /opt/homecore/ui/
 COPY config.toml.example     /opt/homecore/defaults/config.toml
 COPY entrypoint-core.sh      /entrypoint.sh

@@ -1,14 +1,19 @@
 # Generic homeCore plugin image — alpine, optimized for size.
 #
-# Designed to be built by each plugin's release.yml AFTER the musl binary
-# has been produced. The build context is expected to contain:
+# Designed to be built by each plugin's release.yml AFTER the per-arch
+# musl binaries have been produced. The build context is expected to
+# contain ONE PREBUILT BINARY PER TARGET ARCHITECTURE so a single
+# buildx invocation can produce a multi-arch manifest:
 #
-#   ./<binary_name>           — prebuilt static musl binary
+#   ./<binary_name>-amd64     — prebuilt x86_64 static musl binary
+#   ./<binary_name>-arm64     — prebuilt aarch64 static musl binary
 #   ./config.toml.example     — default config (fetched from the plugin repo)
 #   ./entrypoint-plugin.sh    — fetched from the homeCore-io/docker repo
 #
 # Build args:
 #   BINARY_NAME   — e.g. "hc-hue", "hc-sonos". Image tag should match.
+#   TARGETARCH    — supplied automatically by buildx (`amd64` or `arm64`)
+#                   to select the correct binary from the build context.
 #
 # Size targets (after strip + Cargo release profile, see ../README.md):
 #   alpine base + ca-certs + tini ............ ~8 MB
@@ -17,7 +22,7 @@
 #   total .................................... ~13-18 MB
 #
 # Example invocation (from a plugin's release.yml, with binaries already
-# downloaded into ./build-context/):
+# downloaded into ./build-context/ as hc-hue-amd64 + hc-hue-arm64):
 #
 #   docker buildx build \
 #       --platform linux/amd64,linux/arm64 \
@@ -31,16 +36,15 @@ ARG BINARY_NAME
 FROM alpine:3.20
 
 ARG BINARY_NAME
+ARG TARGETARCH
 
 # ca-certificates: outbound HTTPS (cloud APIs, OAuth, mDNS-over-TLS).
 # tini: PID-1 signal handling + zombie reaping under `docker stop`.
-# binutils-strip: ~600 KB; removed in the same layer after stripping the
-# binary so it doesn't bloat the final image.
 RUN apk add --no-cache ca-certificates tini
 
-COPY ${BINARY_NAME}              /usr/local/bin/${BINARY_NAME}
-COPY config.toml.example         /opt/homecore/defaults/config.toml
-COPY entrypoint-plugin.sh        /entrypoint.sh
+COPY ${BINARY_NAME}-${TARGETARCH} /usr/local/bin/${BINARY_NAME}
+COPY config.toml.example          /opt/homecore/defaults/config.toml
+COPY entrypoint-plugin.sh         /entrypoint.sh
 
 # Belt-and-suspenders: strip if the upstream binary still has symbols.
 # Cargo's [profile.release] strip = "symbols" should already handle this,
