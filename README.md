@@ -76,6 +76,54 @@ locally instead (e.g. you're testing a feature branch), point each
 service at `images/Dockerfile.plugin` via a compose override — see
 `images/README.md` (TODO).
 
+## Image sizing
+
+These images target as small as possible while staying on alpine (vs.
+distroless / scratch — alpine keeps a shell + busybox for entrypoint
+flexibility and `docker exec` debugging).
+
+| layer                                      |   typical |
+| ------------------------------------------ | --------: |
+| `alpine:3.20` base                         |    ~7 MB  |
+| `ca-certificates` + `tini`                 |    ~1 MB  |
+| plugin binary (stripped, LTO, musl-static) | ~5–10 MB  |
+| hc-core binary (stripped, LTO, musl-static)| ~10–15 MB |
+| Leptos WASM `dist/` (release)              |  ~1–2 MB  |
+
+Targets: **plugin image ~13–18 MB**, **core image ~19–25 MB** compressed.
+
+### Biggest lever: Cargo release profile
+
+The single highest-impact optimization lives in each plugin / hc-core
+repo's root `Cargo.toml`, NOT in the Dockerfile. Add to every workspace:
+
+```toml
+[profile.release]
+strip       = "symbols"
+lto         = "thin"
+codegen-units = 1
+panic       = "abort"   # optional: smaller, no unwind tables
+```
+
+Without `strip`, every Rust binary ships with debug symbols → ~30–50%
+bloat. The Dockerfiles run `strip --strip-all` as a fallback in case
+the upstream binary still has symbols, but doing it at build time is
+faster and keeps the artifact useful elsewhere (GH release tarball).
+
+### What we're NOT doing (and why)
+
+- **scratch / distroless static** — drop ~7 MB but lose the busybox
+  shell that `entrypoint-{core,plugin}.sh` relies on. We'd have to
+  fold first-boot config seeding into each binary; deferred.
+- **UPX-compressed binaries** — 3–4× smaller on disk but slower
+  startup + flagged by some AV; not worth it for a long-running
+  daemon.
+- **Pre-gzipping the WASM bundle** — only pays off if hc-core's
+  static layer is wired to serve `Content-Encoding: gzip` from `.gz`
+  twins (tower-http `.precompressed_gzip()`). Not currently confirmed
+  on the serve side; revisit when wiring trunk's `--release` step
+  into homeCore's `release.yml`.
+
 ## Advanced: external Mosquitto broker
 
 Not included here. The embedded broker does CONNECT auth only; if you

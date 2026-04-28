@@ -1,4 +1,4 @@
-# Generic homeCore plugin image.
+# Generic homeCore plugin image — alpine, optimized for size.
 #
 # Designed to be built by each plugin's release.yml AFTER the musl binary
 # has been produced. The build context is expected to contain:
@@ -9,6 +9,12 @@
 #
 # Build args:
 #   BINARY_NAME   — e.g. "hc-hue", "hc-sonos". Image tag should match.
+#
+# Size targets (after strip + Cargo release profile, see ../README.md):
+#   alpine base + ca-certs + tini ............ ~8 MB
+#   plugin binary (stripped, LTO) ............. ~5-10 MB
+#   ────────────────────────────────────────────────────
+#   total .................................... ~13-18 MB
 #
 # Example invocation (from a plugin's release.yml, with binaries already
 # downloaded into ./build-context/):
@@ -26,17 +32,25 @@ FROM alpine:3.20
 
 ARG BINARY_NAME
 
-# ca-certificates for outbound HTTPS (cloud APIs, OAuth, etc.).
-# tini for proper PID-1 signal handling under `docker stop`.
+# ca-certificates: outbound HTTPS (cloud APIs, OAuth, mDNS-over-TLS).
+# tini: PID-1 signal handling + zombie reaping under `docker stop`.
+# binutils-strip: ~600 KB; removed in the same layer after stripping the
+# binary so it doesn't bloat the final image.
 RUN apk add --no-cache ca-certificates tini
 
 COPY ${BINARY_NAME}              /usr/local/bin/${BINARY_NAME}
 COPY config.toml.example         /opt/homecore/defaults/config.toml
 COPY entrypoint-plugin.sh        /entrypoint.sh
 
-RUN chmod +x /usr/local/bin/${BINARY_NAME} /entrypoint.sh
+# Belt-and-suspenders: strip if the upstream binary still has symbols.
+# Cargo's [profile.release] strip = "symbols" should already handle this,
+# but a re-strip is cheap and catches missed configs. binutils is added
+# and removed in the same layer to avoid leaving the toolchain behind.
+RUN apk add --no-cache --virtual .strip-deps binutils \
+ && strip --strip-all /usr/local/bin/${BINARY_NAME} \
+ && apk del .strip-deps \
+ && chmod +x /usr/local/bin/${BINARY_NAME} /entrypoint.sh
 
-# Bake the binary name in so the entrypoint can find it.
 ENV BINARY_NAME=${BINARY_NAME}
 
 VOLUME ["/etc/homecore"]

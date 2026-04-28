@@ -1,4 +1,5 @@
-# homeCore core image (hc-core + embedded broker + Leptos web UI bundle).
+# homeCore core image — alpine, optimized for size.
+# (hc-core + embedded broker + Leptos web UI bundle)
 #
 # Designed to be built by homeCore-io/homeCore's release.yml AFTER the
 # musl binary AND the WASM UI bundle have been produced. The build
@@ -9,8 +10,22 @@
 #   ./config.toml.example     — default config (homecore.toml.example)
 #   ./entrypoint-core.sh      — fetched from the homeCore-io/docker repo
 #
-# Example invocation (from homeCore's release.yml, with the binary +
-# WASM bundle staged into ./build-context/):
+# Size targets (after strip + Cargo release profile):
+#   alpine base + ca-certs + tini ............ ~8 MB
+#   hc-core binary (stripped, LTO) ............ ~10-15 MB
+#   WASM bundle (trunk --release, brotli'd) ... ~1-2 MB
+#   ────────────────────────────────────────────────────
+#   total ..................................... ~19-25 MB
+#
+# Note on WASM compression: trunk's release build can emit pre-compressed
+# .br/.gz alongside originals (see Trunk.toml). We don't gzip in the
+# Dockerfile because that would only pay off if hc-core's static-file
+# layer is wired to serve precompressed responses (tower-http
+# `.precompressed_gzip()`). If/when that's confirmed, switch trunk to
+# emit precompressed assets and add a serve-side flag — not a Dockerfile
+# concern.
+#
+# Example invocation:
 #
 #   docker buildx build \
 #       --platform linux/amd64,linux/arm64 \
@@ -20,6 +35,8 @@
 
 FROM alpine:3.20
 
+# ca-certificates: outbound HTTPS for plugins/notifications.
+# tini: PID-1 signal handling + zombie reaping under `docker stop`.
 RUN apk add --no-cache ca-certificates tini
 
 COPY homecore                /usr/local/bin/homecore
@@ -27,9 +44,13 @@ COPY ui/                     /opt/homecore/ui/
 COPY config.toml.example     /opt/homecore/defaults/config.toml
 COPY entrypoint-core.sh      /entrypoint.sh
 
-RUN chmod +x /usr/local/bin/homecore /entrypoint.sh
+# Belt-and-suspenders strip in case [profile.release] strip wasn't set
+# upstream. binutils added + removed in the same layer.
+RUN apk add --no-cache --virtual .strip-deps binutils \
+ && strip --strip-all /usr/local/bin/homecore \
+ && apk del .strip-deps \
+ && chmod +x /usr/local/bin/homecore /entrypoint.sh
 
-# Default config locations (entrypoint seeds these on first boot).
 ENV HC_CONFIG=/etc/homecore/config.toml
 ENV HC_UI_DIR=/opt/homecore/ui
 ENV HC_DATA_DIR=/var/lib/homecore
