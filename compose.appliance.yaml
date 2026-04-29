@@ -35,6 +35,24 @@ services:
     # tag is immutable.
     pull_policy: always
 
+    # Run as the invoking user so files written into ./homecore-data
+    # are host-readable without sudo. Defaults to 1000:1000 (typical
+    # first non-root user on Linux). Override at the shell:
+    #
+    #   HOMECORE_UID=$(id -u) HOMECORE_GID=$(id -g) \
+    #       docker compose -f compose.appliance.yaml up -d
+    #
+    # Or pin in a .env file next to this compose file:
+    #
+    #   HOMECORE_UID=1000
+    #   HOMECORE_GID=1000
+    #
+    # NOTE: pre-create ./homecore-data with this UID/GID before first
+    # boot so the container can write to the bind-mount:
+    #
+    #   mkdir -p homecore-data && chown $(id -u):$(id -g) homecore-data
+    user: "${HOMECORE_UID:-1000}:${HOMECORE_GID:-1000}"
+
     # Host networking is required for plugins that rely on multicast
     # discovery (mDNS for Hue/WLED/Caseta, SSDP for Sonos), and is the
     # simplest way to make the embedded broker reachable to LAN devices.

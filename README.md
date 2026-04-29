@@ -149,16 +149,24 @@ you mount. One mount, one place to look.
 git clone https://github.com/homeCore-io/docker.git homecore-docker
 cd homecore-docker
 
-# 1. Bring it up.
-docker compose -f compose.appliance.yaml up -d
+# 1. Pre-create the host data dir so the container's non-root user
+#    can write to it. (Default UID/GID inside the container is
+#    1000:1000; override via $HOMECORE_UID / $HOMECORE_GID env or
+#    a .env file next to the compose file.)
+mkdir -p homecore-data
+chown $(id -u):$(id -g) homecore-data
 
-# 2. First-boot admin credentials.
+# 2. Bring it up. (Optionally pass your UID/GID if not 1000.)
+HOMECORE_UID=$(id -u) HOMECORE_GID=$(id -g) \
+    docker compose -f compose.appliance.yaml up -d
+
+# 3. First-boot admin credentials — readable as your user.
 cat homecore-data/INITIAL_ADMIN_PASSWORD
 
-# 3. Web UI.
+# 4. Web UI.
 open http://localhost:8080
 
-# 4. Enable the plugins you want hardware for. Edit
+# 5. Enable the plugins you want hardware for. Edit
 #    homecore-data/config/homecore.toml — set `enabled = true`
 #    under each [[plugins]] block you want active. Then:
 docker compose -f compose.appliance.yaml restart
@@ -167,7 +175,11 @@ docker compose -f compose.appliance.yaml restart
 ### Quick start with `docker run`
 
 ```sh
+mkdir -p homecore-data
+chown $(id -u):$(id -g) homecore-data
+
 docker run --rm --network host \
+    --user "$(id -u):$(id -g)" \
     -v $PWD/homecore-data:/homecore \
     ghcr.io/homecore-io/homecore-appliance:0.1.0
 ```
