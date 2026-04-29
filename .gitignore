@@ -1,3 +1,9 @@
 # User-local state — never committed.
+# Each service bind-mounts ONE host dir; ignore them all.
+homecore-data/
+hc-*-data/
+
+# Legacy paths from the dual-volume era — kept ignored so existing
+# operator checkouts that still have these dirs don't see noise.
 config/
 data/

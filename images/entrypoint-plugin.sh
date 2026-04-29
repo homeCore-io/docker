@@ -1,10 +1,14 @@
 #!/bin/sh
-# First-boot config seeder for any hc-* plugin.
+# Per-plugin (per-service compose) entrypoint.
 #
-# BINARY_NAME is baked into the image at build time. We expect:
-#   /usr/local/bin/$BINARY_NAME           — the plugin binary
-#   /opt/homecore/defaults/config.toml    — the bundled default config
-#   /etc/homecore/                        — bind-mounted from the host
+# Single-base-dir layout under $HOMECORE_HOME (default /homecore).
+# Container starts as root, looks at the bind-mount's owner, and
+# su-execs to that user before any mkdir / write / exec. Operator
+# just `mkdir <plugin>-data && docker compose up`.
+#
+# Plugin binaries take a single positional config-path argument
+# (per the plugin SDK's main.rs convention). They don't have a
+# base_dir concept; we just point them at $HOMECORE_HOME/config.toml.
 
 set -e
 
@@ -13,15 +17,40 @@ if [ -z "$BINARY_NAME" ]; then
     exit 1
 fi
 
-CONFIG_DIR=/etc/homecore
-CONFIG_FILE="$CONFIG_DIR/config.toml"
-DEFAULT_CONFIG=/opt/homecore/defaults/config.toml
+HOME_DIR="${HOMECORE_HOME:-/homecore}"
 
-mkdir -p "$CONFIG_DIR"
+# ─── Drop privileges to bind-mount owner ────────────────────────────
+if [ "$(id -u)" = "0" ]; then
+    if [ ! -d "$HOME_DIR" ]; then
+        mkdir -p "$HOME_DIR"
+    fi
+    target_uid=$(stat -c '%u' "$HOME_DIR")
+    target_gid=$(stat -c '%g' "$HOME_DIR")
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    cp "$DEFAULT_CONFIG" "$CONFIG_FILE"
-    echo "[$BINARY_NAME] seeded default config at $CONFIG_FILE — edit and restart"
+    if [ "$target_uid" = "0" ]; then
+        target_uid="${HOMECORE_UID:-1000}"
+        target_gid="${HOMECORE_GID:-1000}"
+        chown "$target_uid:$target_gid" "$HOME_DIR"
+        echo "[$BINARY_NAME] bind-mount was root-owned; chowned $HOME_DIR to $target_uid:$target_gid"
+    fi
+
+    echo "[$BINARY_NAME] dropping privileges to $target_uid:$target_gid"
+    exec su-exec "$target_uid:$target_gid" "$0" "$@"
 fi
 
+# ─── Running as the target non-root user ────────────────────────────
+
+DEFAULTS_DIR=/opt/homecore/defaults
+CONFIG_FILE="$HOME_DIR/config.toml"
+
+mkdir -p "$HOME_DIR"
+
+# ─── Seed config ────────────────────────────────────────────────────
+if [ ! -f "$CONFIG_FILE" ]; then
+    cp "$DEFAULTS_DIR/config.toml" "$CONFIG_FILE"
+    echo "[$BINARY_NAME] seeded default config at $CONFIG_FILE"
+fi
+
+# ─── Start plugin ───────────────────────────────────────────────────
+echo "[$BINARY_NAME] starting with config=$CONFIG_FILE"
 exec "/usr/local/bin/$BINARY_NAME" "$CONFIG_FILE"

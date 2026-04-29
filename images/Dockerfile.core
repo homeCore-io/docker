@@ -6,26 +6,23 @@
 # The build context is expected to contain:
 #
 #   ./homecore-amd64          — prebuilt x86_64 static musl binary
-#   ./homecore-arm64          — prebuilt aarch64 static musl binary
+#   ./homecore-arm64          — prebuilt aarch64 static musl binary  (omitted on fast=true)
 #   ./ui/                     — Leptos `dist/` from `trunk build --release`
 #                               (single bundle — WASM is arch-independent)
 #   ./config.toml.example     — default config (homecore.toml.example)
 #   ./entrypoint-core.sh      — fetched from the homeCore-io/docker repo
 #
-# Size targets (after strip + Cargo release profile):
-#   alpine base + ca-certs + tini ............ ~8 MB
-#   hc-core binary (stripped, LTO) ............ ~10-15 MB
-#   WASM bundle (trunk --release, brotli'd) ... ~1-2 MB
-#   ────────────────────────────────────────────────────
-#   total ..................................... ~19-25 MB
+# Single base directory layout — everything operator-mutable lives
+# under /homecore (one bind-mount). hc-core reads $HOMECORE_HOME and
+# resolves storage / rules / dist_path / jwt_secret_file relative to
+# it. Matches the appliance image's convention.
 #
-# Note on WASM compression: trunk's release build can emit pre-compressed
-# .br/.gz alongside originals (see Trunk.toml). We don't gzip in the
-# Dockerfile because that would only pay off if hc-core's static-file
-# layer is wired to serve precompressed responses (tower-http
-# `.precompressed_gzip()`). If/when that's confirmed, switch trunk to
-# emit precompressed assets and add a serve-side flag — not a Dockerfile
-# concern.
+# Size targets (after strip + Cargo release profile):
+#   alpine base + ca-certs + tini + su-exec   ~8 MB
+#   hc-core binary (stripped, LTO)            ~10-15 MB
+#   WASM bundle (trunk --release)             ~1-2 MB
+#   ────────────────────────────────────────────────────
+#   total                                      ~19-25 MB
 #
 # Example invocation:
 #
@@ -41,27 +38,24 @@ ARG TARGETARCH
 
 # ca-certificates: outbound HTTPS for plugins/notifications.
 # tini: PID-1 signal handling + zombie reaping under `docker stop`.
-RUN apk add --no-cache ca-certificates tini
+# su-exec: drop privileges to bind-mount owner from the entrypoint.
+RUN apk add --no-cache ca-certificates tini su-exec
 
 COPY homecore-${TARGETARCH}  /usr/local/bin/homecore
 COPY ui/                     /opt/homecore/ui/
 COPY config.toml.example     /opt/homecore/defaults/config.toml
 COPY entrypoint-core.sh      /entrypoint.sh
 
-# Belt-and-suspenders strip in case [profile.release] strip wasn't set
-# upstream. binutils added + removed in the same layer.
-RUN apk add --no-cache --virtual .strip-deps binutils \
- && strip --strip-all /usr/local/bin/homecore \
- && apk del .strip-deps \
- && chmod +x /usr/local/bin/homecore /entrypoint.sh
-
-ENV HC_CONFIG=/etc/homecore/config.toml
-ENV HC_UI_DIR=/opt/homecore/ui
-ENV HC_DATA_DIR=/var/lib/homecore
+RUN chmod +x /usr/local/bin/homecore /entrypoint.sh
 
 # Embedded broker on 1883, web UI / API on 8080.
 EXPOSE 1883 8080
 
-VOLUME ["/etc/homecore", "/var/lib/homecore"]
+# Single base directory. Operator bind-mounts a host dir here; the
+# entrypoint detects the owner UID and drops privileges to match
+# before the daemon writes anything.
+ENV HOMECORE_HOME=/homecore
+
+VOLUME ["/homecore"]
 
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]

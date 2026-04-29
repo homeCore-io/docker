@@ -6,9 +6,16 @@
 #
 # Quick start:
 #   1. Uncomment the plugins you want under `include:`.
-#   2. docker compose up -d
-#   3. First boot creates ./config/homecore/config.toml. Edit it.
-#   4. docker compose restart
+#   2. mkdir homecore-data && (optionally chown $(id -u):$(id -g) homecore-data)
+#   3. docker compose up -d
+#   4. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
+#   5. http://<host-ip>:8080                          (web admin UI)
+#   6. docker compose restart                          (after editing configs)
+#
+# Single-bind-mount layout per service. Each container bind-mounts ONE host
+# directory to /homecore; the entrypoint detects the owner and drops
+# privileges to that user before writing anything. So `mkdir homecore-data`
+# as your user is enough — no env vars or pre-chown ritual needed.
 #
 # Web UI:    http://localhost:8080
 # Broker:    127.0.0.1:1883 (host network — plugins reach it directly)
@@ -34,9 +41,12 @@ services:
     image: ghcr.io/homecore-io/hc-core:0.1.0
     container_name: homecore
     restart: unless-stopped
+    pull_policy: always   # see appliance section in README.md for why
     network_mode: host
     environment:
       RUST_LOG: info
     volumes:
-      - ./config/homecore:/etc/homecore
-      - ./data/homecore:/var/lib/homecore
+      # Single bind-mount: everything mutable lives under /homecore.
+      # First boot seeds config/, data/, rules/ here. INITIAL_ADMIN_PASSWORD
+      # lands at the root.
+      - ./homecore-data:/homecore

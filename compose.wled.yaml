@@ -1,15 +1,18 @@
-# WLED plugin. Uncomment under `include:` in compose.yaml to enable.
+# WLED LED controller plugin (mDNS discovery).
+# Uncomment under `include:` in compose.yaml to enable.
 #
 # Setup:
-#   First boot creates ./config/hc-wled/config.toml. WLED controllers
-#   are discovered via mDNS — host networking required.
+#   mkdir hc-wled-data    # owner = your user; entrypoint will match
+#   docker compose up -d
+#   First boot creates ./hc-wled-data/config.toml. Edit, restart.
 services:
   hc-wled:
     image: ghcr.io/homecore-io/hc-wled:0.1.0
     container_name: hc-wled
     restart: unless-stopped
+    pull_policy: always
     network_mode: host
     environment:
       RUST_LOG: info
     volumes:
-      - ./config/hc-wled:/etc/homecore
+      - ./hc-wled-data:/homecore

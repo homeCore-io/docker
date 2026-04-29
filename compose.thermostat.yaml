@@ -1,15 +1,18 @@
-# Generic thermostat plugin. Uncomment under `include:` in compose.yaml
-# to enable.
+# Generic thermostat plugin.
+# Uncomment under `include:` in compose.yaml to enable.
 #
 # Setup:
-#   First boot creates ./config/hc-thermostat/config.toml.
+#   mkdir hc-thermostat-data    # owner = your user; entrypoint will match
+#   docker compose up -d
+#   First boot creates ./hc-thermostat-data/config.toml. Edit, restart.
 services:
   hc-thermostat:
     image: ghcr.io/homecore-io/hc-thermostat:0.1.0
     container_name: hc-thermostat
     restart: unless-stopped
+    pull_policy: always
     network_mode: host
     environment:
       RUST_LOG: info
     volumes:
-      - ./config/hc-thermostat:/etc/homecore
+      - ./hc-thermostat-data:/homecore

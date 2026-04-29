@@ -20,34 +20,51 @@ cd homecore-docker
 # 1. Pick the plugins you want by uncommenting them in compose.yaml.
 $EDITOR compose.yaml
 
-# 2. Bring it up. First boot seeds default configs into ./config/.
+# 2. Pre-create the per-service host dirs as your user. Each
+#    container's entrypoint detects the bind-mount owner and drops
+#    privileges to match — files end up host-readable without sudo.
+mkdir homecore-data hc-hue-data hc-sonos-data    # one per enabled service
+
+# 3. Bring it up. First boot seeds default configs into each dir.
 docker compose up -d
 
-# 3. Edit the seeded configs.
-$EDITOR config/homecore/config.toml
-$EDITOR config/hc-hue/config.toml   # if you enabled Hue
+# 4. First-boot admin credentials.
+cat homecore-data/INITIAL_ADMIN_PASSWORD
 
-# 4. Restart to pick up your edits.
+# 5. Edit the seeded configs.
+$EDITOR homecore-data/config/homecore.toml
+$EDITOR hc-hue-data/config.toml                  # if you enabled Hue
+
+# 6. Restart to pick up your edits.
 docker compose restart
 ```
 
-The web UI is on http://localhost:8080. First-boot admin credentials
-are printed to `docker compose logs homecore`.
+The web UI is on http://localhost:8080.
 
 ## Layout
 
+Each service bind-mounts ONE host directory to `/homecore` inside the
+container. After first boot the per-service directories look like:
+
 ```
-./compose.yaml             base — just hc-core
-./compose.<plugin>.yaml    one fragment per plugin (include: as needed)
-./images/                  Dockerfiles + entrypoints (only used if you
-                           want to build images locally instead of
-                           pulling from ghcr.io)
-./config/                  bind-mounted into each container; first boot
-                           seeds defaults here. EDIT THESE.
-./data/                    bind-mounted state (audit DB, redb, etc.)
+./homecore-data/                   ← hc-core base_dir
+├── INITIAL_ADMIN_PASSWORD         ← printed first boot, delete after login
+├── config/homecore.toml           ← edit and restart
+├── data/state.redb
+├── data/history.db
+├── data/jwt_secret
+├── rules/
+└── logs/
+
+./hc-hue-data/                     ← hc-hue base_dir (plugin)
+└── config.toml                    ← single config file at the root
+
+./hc-sonos-data/
+└── config.toml
+… (one dir per enabled plugin)
 ```
 
-`./config/` and `./data/` are gitignored — they're your local state.
+Each `<service>-data/` is gitignored — it's your local state.
 
 ## Network
 

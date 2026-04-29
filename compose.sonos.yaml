@@ -1,17 +1,18 @@
-# Sonos plugin. Uncomment under `include:` in compose.yaml to enable.
+# Sonos plugin (SSDP discovery — host networking required).
+# Uncomment under `include:` in compose.yaml to enable.
 #
 # Setup:
-#   First boot creates ./config/hc-sonos/config.toml. Speaker discovery is
-#   SSDP (multicast) — host networking is REQUIRED. If discovery fails on
-#   a multi-NIC host, set `manual_hosts` in config.toml. See the Sonos SSDP
-#   notes in the homeCore docs.
+#   mkdir hc-sonos-data    # owner = your user; entrypoint will match
+#   docker compose up -d
+#   First boot creates ./hc-sonos-data/config.toml. Edit, restart.
 services:
   hc-sonos:
     image: ghcr.io/homecore-io/hc-sonos:0.1.0
     container_name: hc-sonos
     restart: unless-stopped
+    pull_policy: always
     network_mode: host
     environment:
       RUST_LOG: info
     volumes:
-      - ./config/hc-sonos:/etc/homecore
+      - ./hc-sonos-data:/homecore
