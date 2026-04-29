@@ -49,6 +49,19 @@ mkdir -p "$HOME_DIR"
 if [ ! -f "$CONFIG_FILE" ]; then
     cp "$DEFAULTS_DIR/config.toml" "$CONFIG_FILE"
     echo "[$BINARY_NAME] seeded default config at $CONFIG_FILE"
+
+    # Optional first-boot env injection — useful for the multi-host
+    # shape where the plugin runs on a different machine than hc-core.
+    # Only fires on FIRST boot; subsequent restarts respect operator
+    # edits to the config file.
+    if [ -n "$HC_BROKER_HOST" ]; then
+        sed -i "s|^broker_host *= *\".*\"|broker_host = \"$HC_BROKER_HOST\"|" "$CONFIG_FILE"
+        echo "[$BINARY_NAME] set broker_host = \"$HC_BROKER_HOST\" (from env)"
+    fi
+    if [ -n "$HC_BROKER_PORT" ]; then
+        sed -i "s|^broker_port *= *.*|broker_port = $HC_BROKER_PORT|" "$CONFIG_FILE"
+        echo "[$BINARY_NAME] set broker_port = $HC_BROKER_PORT (from env)"
+    fi
 fi
 
 # ─── Start plugin ───────────────────────────────────────────────────

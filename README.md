@@ -75,8 +75,30 @@ Every service uses `network_mode: host`. This is required for:
 - the simplest possible plugin → core wiring (`mqtt://127.0.0.1:1883`)
 
 Trade-off: host networking is Linux-specific and assumes one homeCore
-deployment per host. For multi-host (one core, plugins elsewhere), see
-the "Bridge networking" section below — not yet drafted.
+deployment per host. For multi-host setups (hc-core on one machine,
+plugins on others), see [`examples/multi-host/`](examples/multi-host/)
+— ready-to-run compose templates for both ends, plus env-driven
+broker-host seeding so plugins point at the right LAN IP without
+manual config editing.
+
+## Multi-host quick reference
+
+| Scenario | Use |
+|---|---|
+| Everything on one machine | top-level `compose.yaml` (default quickstart above) |
+| hc-core on host A, plugins on host B | [`examples/multi-host/`](examples/multi-host/) |
+| Plugin-only host with hc-core elsewhere (bare metal, K8s, etc.) | [`examples/multi-host/plugin-host/`](examples/multi-host/plugin-host/) |
+
+Env knobs the entrypoints honor on first boot:
+
+| env | target | what it seeds |
+|---|---|---|
+| `HC_BROKER_BIND` | hc-core | `[broker] host` in `homecore.toml` (use `0.0.0.0` for LAN-reachable broker) |
+| `HC_BROKER_HOST` | plugin | plugin's `broker_host` (point at hc-core's LAN IP) |
+| `HC_BROKER_PORT` | plugin | plugin's `broker_port` (default 1883) |
+
+These only fire on first boot when the entrypoint is seeding a fresh
+config. After that, edit the seeded `config.toml` directly.
 
 ## Versioning
 

@@ -1,0 +1,65 @@
+# Multi-host deployment — host B (plugins only).
+#
+# This compose runs plugins on a host that does NOT have hc-core.
+# Each plugin's MQTT client points at hc-core's broker on a remote
+# host (set via HC_BROKER_HOST env). See the sibling core-host/
+# compose.yaml for the hc-core end.
+#
+# Before first run:
+#   1. Replace `__SET_HC_CORE_LAN_IP__` below with the LAN IP of the
+#      host running hc-core (the host A from core-host/compose.yaml).
+#   2. Add or remove plugin services to match the hardware on this host.
+#   3. mkdir <plugin>-data for each enabled service.
+#   4. docker compose up -d
+#
+# The plugins' default config.toml.example sets broker_host =
+# "127.0.0.1" (single-host). The HC_BROKER_HOST env injects the
+# correct value into the seeded config on first boot — no manual
+# editing required for the broker connection.
+#
+# Plugin-specific configuration (Hue API key, Sonos host hints, etc.)
+# still needs the operator's input — edit each plugin's
+# `<plugin>-data/config.toml` after first boot and restart.
+
+services:
+  hc-hue:
+    image: ghcr.io/homecore-io/hc-hue:0.1.0
+    container_name: hc-hue
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: info
+      HC_BROKER_HOST: __SET_HC_CORE_LAN_IP__
+    volumes:
+      - ./hc-hue-data:/homecore
+
+  hc-sonos:
+    image: ghcr.io/homecore-io/hc-sonos:0.1.0
+    container_name: hc-sonos
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: info
+      HC_BROKER_HOST: __SET_HC_CORE_LAN_IP__
+    volumes:
+      - ./hc-sonos-data:/homecore
+
+  # Add or remove services as needed. Available images at
+  # ghcr.io/homecore-io/:
+  #   hc-hue hc-wled hc-yolink hc-lutron hc-sonos hc-isy hc-zwave
+  #   hc-caseta hc-thermostat hc-ecowitt
+  #
+  # Pattern for any plugin (one bind-mount per service):
+  #
+  # hc-<name>:
+  #   image: ghcr.io/homecore-io/hc-<name>:0.1.0
+  #   container_name: hc-<name>
+  #   restart: unless-stopped
+  #   pull_policy: always
+  #   network_mode: host
+  #   environment:
+  #     HC_BROKER_HOST: __SET_HC_CORE_LAN_IP__
+  #   volumes:
+  #     - ./hc-<name>-data:/homecore

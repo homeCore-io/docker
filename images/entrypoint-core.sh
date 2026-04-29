@@ -48,6 +48,18 @@ mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$RULES_DIR"
 if [ ! -f "$CORE_CONFIG" ]; then
     cp "$DEFAULTS_DIR/config.toml" "$CORE_CONFIG"
     echo "[hc-core] seeded default config at $CORE_CONFIG"
+
+    # Optional first-boot env injection — for the multi-host shape
+    # where remote plugins need to reach this broker over the LAN.
+    # Default seeded value is 127.0.0.1 (loopback / single-host).
+    # Set HC_BROKER_BIND=0.0.0.0 in compose to expose to the LAN.
+    # Sed range addresses only the [broker] section so we don't
+    # accidentally touch [server] or anywhere else `host = "..."`
+    # might appear.
+    if [ -n "$HC_BROKER_BIND" ]; then
+        sed -i "/^\[broker\]/,/^\[/ s|^host *= *\".*\"|host = \"$HC_BROKER_BIND\"|" "$CORE_CONFIG"
+        echo "[hc-core] set [broker] host = \"$HC_BROKER_BIND\" (from env)"
+    fi
 fi
 
 # ─── Start hc-core ──────────────────────────────────────────────────

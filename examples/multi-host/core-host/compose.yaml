@@ -1,0 +1,36 @@
+# Multi-host deployment — host A (hc-core only).
+#
+# This compose runs hc-core on its own host; plugins run elsewhere
+# and connect to this machine's broker over the LAN. See the
+# sibling plugin-host/compose.yaml for the other end.
+#
+# Quick start (on host A):
+#   1. mkdir homecore-data
+#   2. docker compose up -d
+#   3. cat homecore-data/INITIAL_ADMIN_PASSWORD
+#   4. http://<host-A-IP>:8080
+#
+# After first boot, the seeded config has [broker] host = 0.0.0.0 so
+# plugins on other hosts can reach 1883 over the LAN. To switch to
+# loopback later, edit homecore-data/config/homecore.toml and restart.
+#
+# DO NOT expose this host's port 1883 to the internet — the embedded
+# broker only enforces CONNECT auth, not topic-level ACLs. For
+# untrusted-network deployments, run an external Mosquitto broker
+# with a proper ACL file (see ../../README.md → Advanced).
+
+services:
+  homecore:
+    image: ghcr.io/homecore-io/hc-core:0.1.0
+    container_name: homecore
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: info
+      # Bind embedded broker to all interfaces. Entrypoint sed-replaces
+      # [broker] host in the seeded homecore.toml on first boot only;
+      # subsequent restarts respect operator edits.
+      HC_BROKER_BIND: "0.0.0.0"
+    volumes:
+      - ./homecore-data:/homecore
