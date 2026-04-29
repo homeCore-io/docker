@@ -6,12 +6,47 @@
 # entrypoint seeds it on first boot (config files + ui symlink) and
 # launches hc-core. hc-core itself supervises each enabled plugin
 # as a managed child process — see [[plugins]] in the seeded
-# config/homecore.toml. Plugins all start disabled; the operator
-# flips `enabled = true` on the ones their hardware needs.
+# config/homecore.toml.
+#
+# UID/GID handling: the container starts as root, looks at the
+# bind-mount's owner, and drops privileges to that user before
+# mkdir/copy/exec. The result: whatever user owns ./homecore-data
+# on the host owns every file the container writes there. Operators
+# don't need to set env vars or pre-chown anything — `mkdir
+# homecore-data && docker compose up` just works.
 
 set -e
 
 HOME_DIR="${HOMECORE_HOME:-/homecore}"
+
+# ─── Drop privileges to bind-mount owner ────────────────────────────
+# Only does anything if we're running as root AND the home dir's
+# owner is non-root. If the operator already set `user:` in compose,
+# we're not root and this stage is a no-op.
+if [ "$(id -u)" = "0" ]; then
+    if [ ! -d "$HOME_DIR" ]; then
+        mkdir -p "$HOME_DIR"
+    fi
+    target_uid=$(stat -c '%u' "$HOME_DIR")
+    target_gid=$(stat -c '%g' "$HOME_DIR")
+
+    if [ "$target_uid" = "0" ]; then
+        # Brand-new bind that landed root-owned (Docker daemon created
+        # the host dir before mount). Use the configured fallback
+        # (default 1000:1000) and chown the dir so the host user can
+        # read what we write.
+        target_uid="${HOMECORE_UID:-1000}"
+        target_gid="${HOMECORE_GID:-1000}"
+        chown "$target_uid:$target_gid" "$HOME_DIR"
+        echo "[appliance] bind-mount was root-owned; chowned $HOME_DIR to $target_uid:$target_gid"
+    fi
+
+    echo "[appliance] dropping privileges to $target_uid:$target_gid"
+    exec su-exec "$target_uid:$target_gid" "$0" "$@"
+fi
+
+# ─── At this point we're running as the target non-root user ────────
+
 DEFAULTS_DIR=/opt/homecore/defaults
 UI_SRC=/opt/homecore/ui
 
@@ -20,10 +55,6 @@ DATA_DIR="$HOME_DIR/data"
 RULES_DIR="$HOME_DIR/rules"
 CORE_CONFIG="$CONFIG_DIR/homecore.toml"
 
-# Plugins whose default configs we seed on first boot. The set matches
-# the [[plugins]] declarations in homecore.appliance.toml — every
-# bundled binary gets a working config so flipping `enabled = true`
-# is the only thing the operator needs to do.
 BUNDLED_PLUGINS="hc-hue hc-wled hc-yolink hc-lutron hc-sonos \
                  hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
 
@@ -36,16 +67,11 @@ if [ ! -f "$CORE_CONFIG" ]; then
 fi
 
 # ─── UI symlink ─────────────────────────────────────────────────────
-# Baked WASM bundle lives at /opt/homecore/ui (outside the volume).
-# Symlink so the seeded config's relative `dist_path = "ui"` resolves.
-# Idempotent: -f replaces any prior symlink without complaint.
 if [ -d "$UI_SRC" ]; then
     ln -sfn "$UI_SRC" "$HOME_DIR/ui"
 fi
 
 # ─── Seed per-plugin configs (regardless of enabled state) ──────────
-# Files exist before the operator flips enabled=true so plugins have
-# working defaults the moment they're enabled.
 for p in $BUNDLED_PLUGINS; do
     plugin_default="$DEFAULTS_DIR/$p/config.toml"
     plugin_config_dir="$CONFIG_DIR/$p"
@@ -64,8 +90,5 @@ for p in $BUNDLED_PLUGINS; do
 done
 
 # ─── Start hc-core ──────────────────────────────────────────────────
-# --home + --config flags make hc-core's path resolution explicit and
-# match the env-supplied HOMECORE_HOME. hc-core supervises each
-# [[plugins]] entry whose enabled = true; tini reaps them on shutdown.
 echo "[appliance] starting hc-core with home=$HOME_DIR"
 exec /usr/local/bin/homecore --home "$HOME_DIR" --config "$CORE_CONFIG"

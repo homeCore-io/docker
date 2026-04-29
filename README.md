@@ -149,16 +149,12 @@ you mount. One mount, one place to look.
 git clone https://github.com/homeCore-io/docker.git homecore-docker
 cd homecore-docker
 
-# 1. Pre-create the host data dir so the container's non-root user
-#    can write to it. (Default UID/GID inside the container is
-#    1000:1000; override via $HOMECORE_UID / $HOMECORE_GID env or
-#    a .env file next to the compose file.)
-mkdir -p homecore-data
-chown $(id -u):$(id -g) homecore-data
+# 1. Create the host data dir as your user — the entrypoint detects
+#    the bind-mount owner and drops privileges to match.
+mkdir homecore-data
 
-# 2. Bring it up. (Optionally pass your UID/GID if not 1000.)
-HOMECORE_UID=$(id -u) HOMECORE_GID=$(id -g) \
-    docker compose -f compose.appliance.yaml up -d
+# 2. Bring it up.
+docker compose -f compose.appliance.yaml up -d
 
 # 3. First-boot admin credentials — readable as your user.
 cat homecore-data/INITIAL_ADMIN_PASSWORD
@@ -175,14 +171,15 @@ docker compose -f compose.appliance.yaml restart
 ### Quick start with `docker run`
 
 ```sh
-mkdir -p homecore-data
-chown $(id -u):$(id -g) homecore-data
-
+mkdir homecore-data
 docker run --rm --network host \
-    --user "$(id -u):$(id -g)" \
     -v $PWD/homecore-data:/homecore \
     ghcr.io/homecore-io/homecore-appliance:0.1.0
 ```
+
+The container starts as root, looks at the bind-mount's owner,
+and `su-exec`s to that user before launching hc-core. Files written
+to `./homecore-data` end up owned by whoever created the host dir.
 
 (Drop `--network host` and add `-p 8080:8080 -p 1883:1883` if you
 don't need mDNS/SSDP discovery — see compose file for the trade-off.)

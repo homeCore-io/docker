@@ -45,7 +45,7 @@ FROM ghcr.io/homecore-io/hc-ecowitt:${COMPONENT_TAG}     AS ecowitt-stage
 # ---------------------------------------------------------------------------
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tini
+RUN apk add --no-cache ca-certificates tini su-exec
 
 # Binaries.
 COPY --from=core-stage       /usr/local/bin/homecore       /usr/local/bin/
