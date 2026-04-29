@@ -1,27 +1,46 @@
 #!/bin/sh
 # homeCore appliance entrypoint.
 #
-# - Seeds default configs into /etc/homecore on first boot (volumed
-#   from the host so subsequent runs preserve the operator's edits).
-# - Starts hc-core (which embeds the MQTT broker) in the background.
-# - Starts each plugin listed in $HC_PLUGINS in the background.
-# - Waits on hc-core; if hc-core exits, the container exits.
+# Single-base-dir layout: everything under $HOMECORE_HOME (default
+# /homecore). The operator bind-mounts that one directory; the
+# entrypoint seeds it on first boot (config files + ui symlink) and
+# launches hc-core + each enabled plugin.
+#
+# - hc-core reads $HOMECORE_HOME from env, so all path-relative fields
+#   in config (storage, rules, dist_path, jwt_secret_file,
+#   initial_admin_password_file) resolve under one tree.
+# - First boot copies defaults into $HOMECORE_HOME/config/. Subsequent
+#   boots preserve operator edits.
+# - Plugin subset comes from $HC_PLUGINS (default: all bundled).
 #
 # tini handles PID-1 signal forwarding + zombie reaping for the
 # background plugins.
 
 set -e
 
-CONFIG_DIR=/etc/homecore
+HOME_DIR="${HOMECORE_HOME:-/homecore}"
 DEFAULTS_DIR=/opt/homecore/defaults
-DATA_DIR="${HC_DATA_DIR:-/var/lib/homecore}"
+UI_SRC=/opt/homecore/ui
 
-mkdir -p "$CONFIG_DIR" "$DATA_DIR"
+CONFIG_DIR="$HOME_DIR/config"
+DATA_DIR="$HOME_DIR/data"
+RULES_DIR="$HOME_DIR/rules"
+CORE_CONFIG="$CONFIG_DIR/homecore.toml"
+
+mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$RULES_DIR"
 
 # ─── Seed core config ───────────────────────────────────────────────
-if [ ! -f "$CONFIG_DIR/config.toml" ]; then
-    cp "$DEFAULTS_DIR/homecore.toml" "$CONFIG_DIR/config.toml"
-    echo "[appliance] seeded core config at $CONFIG_DIR/config.toml"
+if [ ! -f "$CORE_CONFIG" ]; then
+    cp "$DEFAULTS_DIR/homecore.toml" "$CORE_CONFIG"
+    echo "[appliance] seeded core config at $CORE_CONFIG"
+fi
+
+# ─── UI symlink ─────────────────────────────────────────────────────
+# Baked WASM bundle lives at /opt/homecore/ui (outside the volume).
+# Symlink so the seeded config's relative `dist_path = "ui"` resolves.
+# Idempotent: -f replaces any prior symlink without complaint.
+if [ -d "$UI_SRC" ]; then
+    ln -sfn "$UI_SRC" "$HOME_DIR/ui"
 fi
 
 # ─── Seed plugin configs (only for the enabled subset) ──────────────
@@ -43,8 +62,12 @@ for p in $HC_PLUGINS; do
 done
 
 # ─── Start hc-core ──────────────────────────────────────────────────
-echo "[appliance] starting hc-core"
-/usr/local/bin/homecore "$CONFIG_DIR/config.toml" &
+# --home + --config flags make hc-core's path resolution explicit and
+# match the env-supplied HOMECORE_HOME. Belt-and-suspenders: hc-core
+# would honor either alone, but specifying both makes the intent
+# obvious in `ps` output and the run logs.
+echo "[appliance] starting hc-core with home=$HOME_DIR"
+/usr/local/bin/homecore --home "$HOME_DIR" --config "$CORE_CONFIG" &
 CORE_PID=$!
 
 # Embedded broker takes a moment to bind. Plugins that connect too

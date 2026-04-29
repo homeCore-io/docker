@@ -1,0 +1,79 @@
+# homeCore — appliance flavor
+#
+# Seeded by appliance-entrypoint.sh on first boot into
+# <HOMECORE_HOME>/config/homecore.toml. Default HOMECORE_HOME = /homecore,
+# so every state path lands under that single bind-mount:
+#
+#   /homecore/
+#     config/homecore.toml          ← this file, after first boot
+#     config/<plugin>/config.toml   ← seeded per enabled plugin
+#     data/state.redb               ← redb device registry
+#     data/history.db               ← SQLite time-series
+#     rules/*.ron                   ← user automations
+#     ui -> /opt/homecore/ui        ← symlink to baked WASM bundle
+#     INITIAL_ADMIN_PASSWORD        ← first-boot admin creds (delete after login)
+#     jwt_secret                    ← auto-managed
+#     logs/                         ← rolling log files
+#
+# After first boot, edit through the admin UI; this file is not
+# re-applied (operator's edits persist).
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[broker]
+# Embedded broker bound to localhost — used by plugins running in the
+# same container. To accept external MQTT publishes (Tasmota, Shelly,
+# ESPHome on the LAN), change to "0.0.0.0" and add [[broker.clients]].
+host = "127.0.0.1"
+port = 1883
+
+[location]
+# Edit via the admin UI. Placeholders below; sunrise/sunset rules will
+# be off until set.
+latitude  = 38.9072
+longitude = -77.0369
+timezone  = "America/New_York"
+
+[battery]
+threshold_pct    = 20.0
+recover_band_pct = 5.0
+
+[auth]
+token_expiry_hours = 24
+# First-boot admin password lands at <base_dir>/INITIAL_ADMIN_PASSWORD
+# by default. Bind-mount the home dir and `cat appliance-data/INITIAL_ADMIN_PASSWORD`.
+
+[storage]
+# Defaults are relative to base_dir:
+#   state_db_path   = "data/state.redb"
+#   history_db_path = "data/history.db"
+
+[rules]
+# dir = "rules" (default, relative to base_dir)
+
+[profiles]
+# dir = "config/profiles" (default, relative to base_dir)
+
+# Web admin UI — served at /. The appliance entrypoint creates a `ui`
+# symlink at base_dir pointing at the baked /opt/homecore/ui bundle, so
+# this default just works.
+[web_admin]
+enabled   = true
+dist_path = "ui"
+
+[logging]
+level = "info"
+
+[logging.stderr]
+enabled = true
+format  = "pretty"
+ansi    = true
+
+[logging.file]
+enabled          = true
+prefix           = "homecore"
+rotation         = "daily"
+prune_after_days = 5
+format           = "json"

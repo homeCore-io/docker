@@ -132,25 +132,49 @@ faster and keeps the artifact useful elsewhere (GH release tarball).
 ## Appliance image
 
 For evaluation / "kick the tires" use, an all-in-one image bundles
-hc-core + every CI-active plugin into one container:
+hc-core + every CI-active plugin into one container.
+
+**Single bind-mount layout.** Everything operator-mutable (configs,
+state, rules, logs, the first-boot admin password file) lives under
+one directory: `/homecore` inside the container, whichever host path
+you mount. One mount, one place to look.
 
 ```sh
 docker run --rm -p 8080:8080 -p 1883:1883 \
-    -v $PWD/appliance-config:/etc/homecore \
-    -v $PWD/appliance-data:/var/lib/homecore \
+    -v $PWD/homecore-data:/homecore \
     ghcr.io/homecore-io/homecore-appliance:0.1.0
+```
+
+After first boot the host-side `homecore-data/` contains:
+
+```
+homecore-data/
+├── INITIAL_ADMIN_PASSWORD       ← printed on first boot, delete after login
+├── config/
+│   ├── homecore.toml            ← edit and restart
+│   ├── hc-hue/config.toml
+│   └── ... (per enabled plugin)
+├── data/
+│   ├── state.redb
+│   └── history.db
+├── rules/
+├── logs/
+├── jwt_secret                   ← auto-managed
+└── ui -> /opt/homecore/ui       ← symlink to baked WASM bundle
 ```
 
 The container starts hc-core (with its embedded broker) plus every
-plugin listed in `$HC_PLUGINS`. Default is all 10. To narrow it down:
+plugin listed in `$HC_PLUGINS`. Default is all 10. Narrow it down:
 
 ```sh
 docker run -e HC_PLUGINS="hc-hue hc-sonos" \
+    -v $PWD/homecore-data:/homecore \
     ghcr.io/homecore-io/homecore-appliance:0.1.0
 ```
 
-First boot seeds default configs into `/etc/homecore/` (and per-plugin
-`/etc/homecore/<plugin>/config.toml` files). Edit, restart, you're off.
+Web UI: http://localhost:8080. First-boot admin credentials are at
+`./homecore-data/INITIAL_ADMIN_PASSWORD` (and printed to
+`docker compose logs`). Delete that file after you change the password.
 
 The appliance image's tag matches this repo's tag — `:0.1.0` of the
 appliance bundles the `:0.1.0` of hc-core and each plugin. For test

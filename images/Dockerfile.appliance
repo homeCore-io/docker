@@ -8,6 +8,10 @@
 # covers every "give me homeCore plus these plugins" combo without
 # rebuilding.
 #
+# Single bind-mount layout: everything operator-mutable lives under
+# $HOMECORE_HOME (default /homecore). One volume to mount, one place
+# to look.
+#
 # Build args:
 #   COMPONENT_TAG  — tag to pull per-component images at. Defaults to
 #                    "latest" for dispatch-style test builds. The
@@ -43,9 +47,7 @@ FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tini
 
-# Binaries (~25–30 MB each stripped, so ~330 MB worth of binaries plus
-# the alpine base + WASM bundle. Larger than the per-service approach,
-# which is the cost of "one image, all plugins available".)
+# Binaries.
 COPY --from=core-stage       /usr/local/bin/homecore       /usr/local/bin/
 COPY --from=hue-stage        /usr/local/bin/hc-hue         /usr/local/bin/
 COPY --from=wled-stage       /usr/local/bin/hc-wled        /usr/local/bin/
@@ -58,12 +60,15 @@ COPY --from=caseta-stage     /usr/local/bin/hc-caseta      /usr/local/bin/
 COPY --from=thermostat-stage /usr/local/bin/hc-thermostat  /usr/local/bin/
 COPY --from=ecowitt-stage    /usr/local/bin/hc-ecowitt     /usr/local/bin/
 
-# Leptos WASM bundle (only ships in core's image)
+# Leptos WASM bundle — baked at /opt/homecore/ui (outside the volume so
+# image layers persist after mount). Entrypoint creates a `ui` symlink
+# at $HOMECORE_HOME/ui pointing here, so the seeded config's
+# `dist_path = "ui"` resolves correctly.
 COPY --from=core-stage /opt/homecore/ui /opt/homecore/ui
 
-# Default configs from each component's image, namespaced per service so
-# the entrypoint can seed only the plugins the operator enabled.
-COPY --from=core-stage       /opt/homecore/defaults/config.toml /opt/homecore/defaults/homecore.toml
+# Per-plugin default configs from each component's image. Entrypoint
+# seeds these into $HOMECORE_HOME/config/<plugin>/config.toml on first
+# boot for the subset of plugins in $HC_PLUGINS.
 COPY --from=hue-stage        /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-hue/config.toml
 COPY --from=wled-stage       /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-wled/config.toml
 COPY --from=yolink-stage     /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-yolink/config.toml
@@ -75,21 +80,32 @@ COPY --from=caseta-stage     /opt/homecore/defaults/config.toml /opt/homecore/de
 COPY --from=thermostat-stage /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-thermostat/config.toml
 COPY --from=ecowitt-stage    /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-ecowitt/config.toml
 
+# Appliance-flavor core config — overrides the generic homecore.toml.example
+# baked into hc-core's image. This one has [web_admin] enabled with
+# `dist_path = "ui"` and matches the single-base-dir layout the entrypoint
+# creates. Seeded into $HOMECORE_HOME/config/homecore.toml on first boot.
+COPY images/homecore.appliance.toml /opt/homecore/defaults/homecore.toml
+
 COPY images/appliance-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Default plugin list. Override at runtime to enable only what you want:
 #   docker run -e HC_PLUGINS="hc-hue hc-sonos" ghcr.io/homecore-io/homecore-appliance
 ENV HC_PLUGINS="hc-hue hc-wled hc-yolink hc-lutron hc-sonos hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
-ENV HC_CONFIG=/etc/homecore/config.toml
-ENV HC_UI_DIR=/opt/homecore/ui
-ENV HC_DATA_DIR=/var/lib/homecore
+
+# Single base directory. hc-core reads $HOMECORE_HOME natively and resolves
+# every config-path field (storage, rules, dist_path, jwt_secret_file,
+# initial_admin_password_file) relative to it.
+ENV HOMECORE_HOME=/homecore
 
 # Embedded broker on 1883 (loopback by default — plugins inside the
 # container reach it at 127.0.0.1:1883 since they share the netns).
 # Web UI / API on 8080.
 EXPOSE 1883 8080
 
-VOLUME ["/etc/homecore", "/var/lib/homecore"]
+# One mount, one place to look. Operator bind-mounts a host directory
+# here; everything mutable lives under it (config, data, rules, logs,
+# the password file, the ui symlink).
+VOLUME ["/homecore"]
 
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
