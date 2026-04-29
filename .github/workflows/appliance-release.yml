@@ -1,0 +1,96 @@
+# Build + push the homeCore appliance image (all-in-one container) to
+# ghcr.io/homecore-io/homecore-appliance.
+#
+# Triggers:
+#   - workflow_dispatch  → tags via inputs (use for ad-hoc test builds)
+#   - tag push (v*)       → component_tag and appliance_tag both = stripped ref
+#
+# Per-component images (hc-core + 10 plugins) are pulled FROM ghcr.io
+# at COMPONENT_TAG; binaries are extracted and bundled into a single
+# alpine runtime layer. Multi-arch (linux/amd64 + linux/arm64) via the
+# component manifests — buildx picks the right arch automatically.
+
+name: Appliance image
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  workflow_dispatch:
+    inputs:
+      component_tag:
+        description: 'Tag of ghcr.io/homecore-io/hc-* component images to bundle'
+        required: true
+        default: 'latest'
+      appliance_tag:
+        description: 'Tag for the published appliance image'
+        required: true
+        default: 'dev'
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build appliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tags
+        id: tags
+        run: |
+          set -eux
+          if [ "${{ github.event_name }}" = "push" ]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+              COMPONENT_TAG="$VERSION"
+              APPLIANCE_TAG="$VERSION"
+          else
+              COMPONENT_TAG="${{ inputs.component_tag }}"
+              APPLIANCE_TAG="${{ inputs.appliance_tag }}"
+          fi
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          {
+              echo "component_tag=${COMPONENT_TAG}"
+              echo "appliance_image=ghcr.io/${OWNER}/homecore-appliance:${APPLIANCE_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push appliance image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: images/Dockerfile.appliance
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            COMPONENT_TAG=${{ steps.tags.outputs.component_tag }}
+          tags: ${{ steps.tags.outputs.appliance_image }}
+          push: true
+
+      - name: Image summary
+        run: |
+          {
+              echo "## Appliance image"
+              echo ""
+              echo "Pushed: \`${{ steps.tags.outputs.appliance_image }}\`"
+              echo "Bundles components @ tag: \`${{ steps.tags.outputs.component_tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

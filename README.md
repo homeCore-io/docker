@@ -1,14 +1,13 @@
 # homeCore — Docker distribution
 
-Multi-container compose setup for running [homeCore](https://homecore.io)
-plus the plugins you want, using the embedded MQTT broker.
+Two artifacts ship from this repo:
 
-For an all-in-one container (good for evaluating, not for running real
-devices long-term), see `Dockerfile.appliance` at the homeCore meta repo
-root instead — that's the "single image, everything baked in" path.
-
-This repo is the **multi-container path**: hc-core in one container,
-each plugin in its own, glued together with compose `include:`.
+1. **Multi-container compose** — hc-core + each plugin as its own
+   service, glued together via compose `include:`. The recommended
+   shape for any real install. Documented below.
+2. **All-in-one appliance image** — every binary baked into a single
+   container. Quick to spin up for evaluation; not the recommended
+   shape long-term. See [Appliance image](#appliance-image) below.
 
 ---
 
@@ -129,6 +128,58 @@ faster and keeps the artifact useful elsewhere (GH release tarball).
   twins (tower-http `.precompressed_gzip()`). Not currently confirmed
   on the serve side; revisit when wiring trunk's `--release` step
   into homeCore's `release.yml`.
+
+## Appliance image
+
+For evaluation / "kick the tires" use, an all-in-one image bundles
+hc-core + every CI-active plugin into one container:
+
+```sh
+docker run --rm -p 8080:8080 -p 1883:1883 \
+    -v $PWD/appliance-config:/etc/homecore \
+    -v $PWD/appliance-data:/var/lib/homecore \
+    ghcr.io/homecore-io/homecore-appliance:0.1.0
+```
+
+The container starts hc-core (with its embedded broker) plus every
+plugin listed in `$HC_PLUGINS`. Default is all 10. To narrow it down:
+
+```sh
+docker run -e HC_PLUGINS="hc-hue hc-sonos" \
+    ghcr.io/homecore-io/homecore-appliance:0.1.0
+```
+
+First boot seeds default configs into `/etc/homecore/` (and per-plugin
+`/etc/homecore/<plugin>/config.toml` files). Edit, restart, you're off.
+
+The appliance image's tag matches this repo's tag — `:0.1.0` of the
+appliance bundles the `:0.1.0` of hc-core and each plugin. For test
+builds, `workflow_dispatch` the *Appliance image* workflow with custom
+component/appliance tags.
+
+**When NOT to use it:**
+
+- For real device deployment with multiple plugins — use the
+  multi-container compose path. Each plugin in its own container is
+  cleaner to upgrade, restart, and scope failures.
+- For ARM-only hardware that's pinned to ARMv7 — the appliance is
+  amd64 + arm64 only.
+
+**How it's built:** `images/Dockerfile.appliance` is a multi-stage
+Dockerfile that pulls binaries OUT of each per-component image:
+
+```dockerfile
+FROM ghcr.io/homecore-io/hc-core:${COMPONENT_TAG}  AS core-stage
+FROM ghcr.io/homecore-io/hc-hue:${COMPONENT_TAG}   AS hue-stage
+# … one per plugin
+FROM alpine:3.20
+COPY --from=core-stage /usr/local/bin/homecore /usr/local/bin/
+# … etc
+```
+
+Multi-arch comes for free — buildx resolves each `FROM` to the right
+arch via the component's manifest. Build takes ~2 min (no Rust
+compilation, just COPY layers).
 
 ## Advanced: external Mosquitto broker
 
