@@ -168,6 +168,13 @@ open http://localhost:8080
 docker compose -f compose.appliance.yaml restart
 ```
 
+> **Pre-release tag note:** while the appliance is on the moving
+> `:dev` tag, periodically purge `homecore-data/` between major
+> entrypoint or seeded-config changes — the entrypoint only writes
+> `homecore.toml` on first boot, so changes to the bundled default
+> config don't take effect on existing data dirs. Once you're on a
+> tagged release (`:0.1.0` etc.) this isn't a concern.
+
 ### Quick start with `docker run`
 
 ```sh
