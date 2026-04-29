@@ -26,6 +26,14 @@ on:
         description: 'Tag for the published appliance image'
         required: true
         default: 'dev'
+      fast:
+        description: >-
+          Skip the linux/arm64 platform to halve runtime. Pass true on
+          ad-hoc dev iteration; defaults false so tag pushes always
+          publish a multi-arch manifest.
+        type: boolean
+        required: false
+        default: false
   push:
     tags: ['v*']
 
@@ -60,7 +68,9 @@ jobs:
               echo "appliance_image=ghcr.io/${OWNER}/homecore-appliance:${APPLIANCE_TAG}"
           } >> "$GITHUB_OUTPUT"
 
+      # Skip QEMU when fast=true — emulation isn't needed for amd64-only.
       - name: Set up QEMU
+        if: ${{ !inputs.fast }}
         uses: docker/setup-qemu-action@v3
         with:
           platforms: linux/amd64,linux/arm64
@@ -80,7 +90,7 @@ jobs:
         with:
           context: .
           file: images/Dockerfile.appliance
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ inputs.fast && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           build-args: |
             COMPONENT_TAG=${{ steps.tags.outputs.component_tag }}
           tags: ${{ steps.tags.outputs.appliance_image }}
