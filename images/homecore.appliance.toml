@@ -56,12 +56,13 @@ token_expiry_hours = 24
 [profiles]
 # dir = "config/profiles" (default, relative to base_dir)
 
-# Web admin UI — served at /. The appliance entrypoint creates a `ui`
-# symlink at base_dir pointing at the baked /opt/homecore/ui bundle, so
-# this default just works.
+# Web admin UI — served at /. The bundle is baked into the image at
+# /opt/homecore/ui (immutable, image-internal); we point dist_path at
+# it directly so there's no symlink in the operator's bind-mount.
+# Same convention as the [[plugins]] binary paths above.
 [web_admin]
 enabled   = true
-dist_path = "ui"
+dist_path = "/opt/homecore/ui"
 
 [logging]
 level = "info"

@@ -48,7 +48,6 @@ fi
 # ─── At this point we're running as the target non-root user ────────
 
 DEFAULTS_DIR=/opt/homecore/defaults
-UI_SRC=/opt/homecore/ui
 
 CONFIG_DIR="$HOME_DIR/config"
 DATA_DIR="$HOME_DIR/data"
@@ -64,11 +63,6 @@ mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$RULES_DIR"
 if [ ! -f "$CORE_CONFIG" ]; then
     cp "$DEFAULTS_DIR/homecore.toml" "$CORE_CONFIG"
     echo "[appliance] seeded core config at $CORE_CONFIG"
-fi
-
-# ─── UI symlink ─────────────────────────────────────────────────────
-if [ -d "$UI_SRC" ]; then
-    ln -sfn "$UI_SRC" "$HOME_DIR/ui"
 fi
 
 # ─── Seed per-plugin configs (regardless of enabled state) ──────────
