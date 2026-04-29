@@ -29,6 +29,11 @@ services:
     image: ghcr.io/homecore-io/homecore-appliance:0.1.0
     container_name: homecore-appliance
     restart: unless-stopped
+    # Always check for an updated image when bringing the stack up.
+    # The mutable :dev tag changes during pre-release iteration; on
+    # tagged releases (:0.1.0 etc.) this is a cheap no-op since the
+    # tag is immutable.
+    pull_policy: always
 
     # Host networking is required for plugins that rely on multicast
     # discovery (mDNS for Hue/WLED/Caseta, SSDP for Sonos), and is the
