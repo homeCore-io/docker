@@ -77,3 +77,76 @@ prefix           = "homecore"
 rotation         = "daily"
 prune_after_days = 5
 format           = "json"
+
+# ---------------------------------------------------------------------------
+# Plugins — all bundled, all disabled by default.
+#
+# Every plugin binary the appliance image ships with is declared here.
+# Set `enabled = true` on the ones your hardware actually has, then
+# restart the container; hc-core spawns each enabled plugin as a
+# managed child process.
+#
+# The per-plugin config files at config/<plugin>/config.toml are
+# seeded on first boot, so each plugin has working defaults the
+# moment you enable it. Edit them through the admin UI or directly.
+# ---------------------------------------------------------------------------
+
+[[plugins]]
+id      = "hc-hue"
+binary  = "/usr/local/bin/hc-hue"
+config  = "config/hc-hue/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-wled"
+binary  = "/usr/local/bin/hc-wled"
+config  = "config/hc-wled/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-yolink"
+binary  = "/usr/local/bin/hc-yolink"
+config  = "config/hc-yolink/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-lutron"
+binary  = "/usr/local/bin/hc-lutron"
+config  = "config/hc-lutron/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-sonos"
+binary  = "/usr/local/bin/hc-sonos"
+config  = "config/hc-sonos/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-isy"
+binary  = "/usr/local/bin/hc-isy"
+config  = "config/hc-isy/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-zwave"
+binary  = "/usr/local/bin/hc-zwave"
+config  = "config/hc-zwave/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-caseta"
+binary  = "/usr/local/bin/hc-caseta"
+config  = "config/hc-caseta/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-thermostat"
+binary  = "/usr/local/bin/hc-thermostat"
+config  = "config/hc-thermostat/config.toml"
+enabled = false
+
+[[plugins]]
+id      = "hc-ecowitt"
+binary  = "/usr/local/bin/hc-ecowitt"
+config  = "config/hc-ecowitt/config.toml"
+enabled = false

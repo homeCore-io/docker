@@ -89,10 +89,6 @@ COPY images/homecore.appliance.toml /opt/homecore/defaults/homecore.toml
 COPY images/appliance-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Default plugin list. Override at runtime to enable only what you want:
-#   docker run -e HC_PLUGINS="hc-hue hc-sonos" ghcr.io/homecore-io/homecore-appliance
-ENV HC_PLUGINS="hc-hue hc-wled hc-yolink hc-lutron hc-sonos hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
-
 # Single base directory. hc-core reads $HOMECORE_HOME natively and resolves
 # every config-path field (storage, rules, dist_path, jwt_secret_file,
 # initial_admin_password_file) relative to it.

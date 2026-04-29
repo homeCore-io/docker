@@ -132,49 +132,91 @@ faster and keeps the artifact useful elsewhere (GH release tarball).
 ## Appliance image
 
 For evaluation / "kick the tires" use, an all-in-one image bundles
-hc-core + every CI-active plugin into one container.
+hc-core + every CI-active plugin into one container. The image
+**includes every plugin binary** and declares each one in the
+seeded `homecore.toml` with `enabled = false`. To turn a plugin on,
+edit the seeded config and flip its `enabled` flag — hc-core
+supervises every enabled plugin as a managed child process.
 
 **Single bind-mount layout.** Everything operator-mutable (configs,
 state, rules, logs, the first-boot admin password file) lives under
 one directory: `/homecore` inside the container, whichever host path
 you mount. One mount, one place to look.
 
+### Quick start with compose
+
 ```sh
-docker run --rm -p 8080:8080 -p 1883:1883 \
+git clone https://github.com/homeCore-io/docker.git homecore-docker
+cd homecore-docker
+
+# 1. Bring it up.
+docker compose -f compose.appliance.yaml up -d
+
+# 2. First-boot admin credentials.
+cat homecore-data/INITIAL_ADMIN_PASSWORD
+
+# 3. Web UI.
+open http://localhost:8080
+
+# 4. Enable the plugins you want hardware for. Edit
+#    homecore-data/config/homecore.toml — set `enabled = true`
+#    under each [[plugins]] block you want active. Then:
+docker compose -f compose.appliance.yaml restart
+```
+
+### Quick start with `docker run`
+
+```sh
+docker run --rm --network host \
     -v $PWD/homecore-data:/homecore \
     ghcr.io/homecore-io/homecore-appliance:0.1.0
 ```
 
-After first boot the host-side `homecore-data/` contains:
+(Drop `--network host` and add `-p 8080:8080 -p 1883:1883` if you
+don't need mDNS/SSDP discovery — see compose file for the trade-off.)
+
+### Plugins included in the image
+
+Each is declared in `homecore.toml`'s `[[plugins]]` blocks with
+`enabled = false`. Flip the flag to enable.
+
+| name | covers |
+|------|--------|
+| `hc-hue`        | Philips Hue |
+| `hc-wled`       | WLED LED controllers |
+| `hc-yolink`     | YoLink cloud sensors |
+| `hc-lutron`     | Lutron HomeWorks / RA2 |
+| `hc-sonos`      | Sonos speakers |
+| `hc-isy`        | Universal Devices ISY (994 / Polisy / eisy) |
+| `hc-zwave`      | Z-Wave (via zwave-js-server) |
+| `hc-caseta`     | Lutron Caseta Smart Bridge Pro |
+| `hc-thermostat` | Generic thermostat |
+| `hc-ecowitt`    | Ecowitt weather stations |
+
+### Host-side filesystem layout
+
+After first boot the bind-mounted `homecore-data/` contains:
 
 ```
 homecore-data/
 ├── INITIAL_ADMIN_PASSWORD       ← printed on first boot, delete after login
 ├── config/
 │   ├── homecore.toml            ← edit and restart
-│   ├── hc-hue/config.toml
+│   ├── hc-hue/config.toml       ← seeded for each enabled plugin
 │   └── ... (per enabled plugin)
 ├── data/
 │   ├── state.redb
-│   └── history.db
+│   ├── history.db
+│   └── jwt_secret               ← auto-managed
 ├── rules/
 ├── logs/
-├── jwt_secret                   ← auto-managed
 └── ui -> /opt/homecore/ui       ← symlink to baked WASM bundle
-```
-
-The container starts hc-core (with its embedded broker) plus every
-plugin listed in `$HC_PLUGINS`. Default is all 10. Narrow it down:
-
-```sh
-docker run -e HC_PLUGINS="hc-hue hc-sonos" \
-    -v $PWD/homecore-data:/homecore \
-    ghcr.io/homecore-io/homecore-appliance:0.1.0
 ```
 
 Web UI: http://localhost:8080. First-boot admin credentials are at
 `./homecore-data/INITIAL_ADMIN_PASSWORD` (and printed to
-`docker compose logs`). Delete that file after you change the password.
+`docker compose logs homecore`). Delete that file after you change
+the password.
 
 The appliance image's tag matches this repo's tag — `:0.1.0` of the
 appliance bundles the `:0.1.0` of hc-core and each plugin. For test

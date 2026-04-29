@@ -1,0 +1,52 @@
+# =============================================================================
+# homeCore — appliance compose
+#
+# All-in-one container: hc-core (with embedded MQTT broker + Leptos UI)
+# plus every CI-active plugin BAKED INTO THE IMAGE. Every plugin starts
+# disabled. To turn on the ones your hardware supports, edit
+# `homecore-data/config/homecore.toml` (after first boot) and flip the
+# matching `[[plugins]]` block's `enabled = true`.
+#
+# Quick start:
+#   1. docker compose -f compose.appliance.yaml up -d
+#   2. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
+#   3. http://<host-ip>:8080                          (web admin UI)
+#   4. Edit homecore-data/config/homecore.toml — set enabled = true
+#      under each [[plugins]] block you want active. Then:
+#        docker compose -f compose.appliance.yaml restart
+#
+# After first boot, ./homecore-data/ contains config/, data/, rules/,
+# logs/, jwt_secret, INITIAL_ADMIN_PASSWORD, and a `ui` symlink. Edit
+# configs, restart, you're off.
+#
+# For the multi-container per-service shape (recommended for production
+# with many devices), see compose.yaml + the per-plugin fragments
+# instead.
+# =============================================================================
+
+services:
+  homecore:
+    image: ghcr.io/homecore-io/homecore-appliance:0.1.0
+    container_name: homecore-appliance
+    restart: unless-stopped
+
+    # Host networking is required for plugins that rely on multicast
+    # discovery (mDNS for Hue/WLED/Caseta, SSDP for Sonos), and is the
+    # simplest way to make the embedded broker reachable to LAN devices.
+    # On macOS / Windows Docker Desktop, host networking has limited
+    # support — switch to bridge + explicit port mappings if you don't
+    # need discovery-based plugins:
+    #
+    #   network_mode: bridge
+    #   ports:
+    #     - "8080:8080"   # web UI / API
+    #     - "1883:1883"   # MQTT (only if external devices publish to it)
+    network_mode: host
+
+    environment:
+      RUST_LOG: info
+
+    volumes:
+      # Single bind-mount: everything mutable lives under /homecore.
+      # First boot seeds config/, data/, rules/, ui (symlink) here.
+      - ./homecore-data:/homecore
