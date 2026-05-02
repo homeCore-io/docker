@@ -54,18 +54,26 @@ jobs:
         id: tags
         run: |
           set -eux
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          BASE="ghcr.io/${OWNER}/homecore-appliance"
+
           if [ "${{ github.event_name }}" = "push" ]; then
+              # Tag push: appliance gets both the immutable version tag AND
+              # the rolling :latest tag. Components are pulled from :latest
+              # to decouple plugin versioning from appliance/core cadence —
+              # the latest plugin build at appliance build time wins.
               VERSION="${GITHUB_REF_NAME#v}"
-              COMPONENT_TAG="$VERSION"
-              APPLIANCE_TAG="$VERSION"
+              COMPONENT_TAG="latest"
+              APPLIANCE_TAGS=$(printf '%s\n%s' "${BASE}:${VERSION}" "${BASE}:latest")
           else
               COMPONENT_TAG="${{ inputs.component_tag }}"
-              APPLIANCE_TAG="${{ inputs.appliance_tag }}"
+              APPLIANCE_TAGS="${BASE}:${{ inputs.appliance_tag }}"
           fi
-          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           {
               echo "component_tag=${COMPONENT_TAG}"
-              echo "appliance_image=ghcr.io/${OWNER}/homecore-appliance:${APPLIANCE_TAG}"
+              echo "appliance_tags<<EOTAGS"
+              echo "${APPLIANCE_TAGS}"
+              echo "EOTAGS"
           } >> "$GITHUB_OUTPUT"
 
       # Skip QEMU when fast=true — emulation isn't needed for amd64-only.
@@ -93,7 +101,7 @@ jobs:
           platforms: ${{ inputs.fast && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           build-args: |
             COMPONENT_TAG=${{ steps.tags.outputs.component_tag }}
-          tags: ${{ steps.tags.outputs.appliance_image }}
+          tags: ${{ steps.tags.outputs.appliance_tags }}
           push: true
 
       - name: Image summary
@@ -101,6 +109,9 @@ jobs:
           {
               echo "## Appliance image"
               echo ""
-              echo "Pushed: \`${{ steps.tags.outputs.appliance_image }}\`"
+              echo "Pushed:"
+              echo '```'
+              echo "${{ steps.tags.outputs.appliance_tags }}"
+              echo '```'
               echo "Bundles components @ tag: \`${{ steps.tags.outputs.component_tag }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
