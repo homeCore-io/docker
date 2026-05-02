@@ -76,9 +76,9 @@ jobs:
               echo "EOTAGS"
           } >> "$GITHUB_OUTPUT"
 
-      # Skip QEMU when fast=true — emulation isn't needed for amd64-only.
+      # FORCE_FAST: `if: false` skips QEMU; revert to `!inputs.fast`.
       - name: Set up QEMU
-        if: ${{ !inputs.fast }}
+        if: ${{ false }}
         uses: docker/setup-qemu-action@v3
         with:
           platforms: linux/amd64,linux/arm64
@@ -98,7 +98,8 @@ jobs:
         with:
           context: .
           file: images/Dockerfile.appliance
-          platforms: ${{ inputs.fast && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          # FORCE_FAST: `true &&` forces amd64-only; revert to `inputs.fast`.
+          platforms: ${{ true && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           build-args: |
             COMPONENT_TAG=${{ steps.tags.outputs.component_tag }}
           tags: ${{ steps.tags.outputs.appliance_tags }}
