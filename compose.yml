@@ -22,26 +22,29 @@
 #
 # All services use `network_mode: host` — required for mDNS/SSDP discovery
 # and for IoT devices on the LAN to reach the embedded broker.
+#
+# This file tracks the `:latest` tag (most recent stable release). For the
+# bleeding-edge develop-branch builds, use compose-dev.yml instead.
 # =============================================================================
 
 include:
-  # - compose.hue.yaml
-  # - compose.sonos.yaml
-  # - compose.yolink.yaml
-  # - compose.lutron.yaml
-  # - compose.wled.yaml
-  # - compose.isy.yaml
-  # - compose.zwave.yaml
-  # - compose.caseta.yaml
-  # - compose.thermostat.yaml
-  # - compose.ecowitt.yaml
+  # - compose.hue.yml
+  # - compose.sonos.yml
+  # - compose.yolink.yml
+  # - compose.lutron.yml
+  # - compose.wled.yml
+  # - compose.isy.yml
+  # - compose.zwave.yml
+  # - compose.caseta.yml
+  # - compose.thermostat.yml
+  # - compose.ecowitt.yml
 
 services:
   homecore:
-    image: ghcr.io/homecore-io/hc-core:0.1.0
+    image: ghcr.io/homecore-io/hc-core:latest
     container_name: homecore
     restart: unless-stopped
-    pull_policy: always   # see appliance section in README.md for why
+    pull_policy: always
     network_mode: host
     environment:
       RUST_LOG: info

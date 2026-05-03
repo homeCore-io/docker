@@ -1,0 +1,13 @@
+# Lutron Caseta plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-caseta-dev:
+    image: ghcr.io/homecore-io/hc-caseta:dev
+    container_name: hc-caseta-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-caseta-data-dev:/homecore

@@ -1,0 +1,13 @@
+# Philips Hue plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-hue-dev:
+    image: ghcr.io/homecore-io/hc-hue:dev
+    container_name: hc-hue-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-hue-data-dev:/homecore

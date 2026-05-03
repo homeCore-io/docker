@@ -1,5 +1,5 @@
 # Sonos plugin (SSDP discovery — host networking required).
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-sonos-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-sonos-data/config.toml. Edit, restart.
 services:
   hc-sonos:
-    image: ghcr.io/homecore-io/hc-sonos:0.1.0
+    image: ghcr.io/homecore-io/hc-sonos:latest
     container_name: hc-sonos
     restart: unless-stopped
     pull_policy: always

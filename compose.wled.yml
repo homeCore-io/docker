@@ -1,5 +1,5 @@
 # WLED LED controller plugin (mDNS discovery).
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-wled-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-wled-data/config.toml. Edit, restart.
 services:
   hc-wled:
-    image: ghcr.io/homecore-io/hc-wled:0.1.0
+    image: ghcr.io/homecore-io/hc-wled:latest
     container_name: hc-wled
     restart: unless-stopped
     pull_policy: always

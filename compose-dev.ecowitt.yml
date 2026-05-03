@@ -1,0 +1,13 @@
+# Ecowitt weather station plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-ecowitt-dev:
+    image: ghcr.io/homecore-io/hc-ecowitt:dev
+    container_name: hc-ecowitt-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-ecowitt-data-dev:/homecore

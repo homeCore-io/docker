@@ -1,0 +1,37 @@
+# =============================================================================
+# homeCore — appliance compose (DEVELOP-BRANCH BUILDS)
+#
+# Same shape as compose.appliance.yml but pinned to the `:dev` tag — built
+# on every push to `develop`. Use for live-testing pre-release appliance
+# images before they land in a tagged release.
+#
+# Container name + data dir carry a `-dev` suffix so dev and stable stacks
+# don't collide.
+#
+# Quick start:
+#   1. docker compose -f compose-dev.appliance.yml up -d
+#   2. cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
+#   3. http://<host-ip>:8080
+#
+# For the stable `:latest` track, see compose.appliance.yml.
+# =============================================================================
+
+services:
+  homecore-dev:
+    image: ghcr.io/homecore-io/homecore-appliance:dev
+    container_name: homecore-appliance-dev
+    restart: unless-stopped
+    # `:dev` is mutable — develop-branch pushes retag it. Always pull
+    # so `up` actually picks up the latest commit's build.
+    pull_policy: always
+
+    # Host networking: required for mDNS/SSDP discovery and to make the
+    # embedded broker reachable to LAN devices. See compose.appliance.yml
+    # for the bridge-mode alternative if discovery isn't needed.
+    network_mode: host
+
+    environment:
+      RUST_LOG: debug
+
+    volumes:
+      - ./homecore-data-dev:/homecore

@@ -1,0 +1,103 @@
+# Dockerfile.plugin-from-source — generic Debian template for building any
+# hc-* plugin from source as a standalone container.
+#
+# Differs from the canonical homeCore-io/docker/images/Dockerfile.plugin in
+# two ways:
+#
+#   1. Builds from source inside the container (cargo build), instead of
+#      copying a prebuilt musl binary that the release workflow assembled.
+#      Means you don't need to run `cargo build --release --target
+#      x86_64-unknown-linux-musl` first.
+#
+#   2. Debian (rust:1.87-slim-bookworm → debian:bookworm-slim) instead of
+#      Alpine. Slightly larger images but fewer surprises around musl /
+#      OpenSSL quirks. Worth using when the canonical Alpine path fights
+#      back during local iteration.
+#
+# Use case: local dev — "give me a quick container of any plugin" without
+# cd'ing into each plugin's repo and running its own Dockerfile, and
+# without going through the full release pipeline. Not used by CI / not
+# used to publish ghcr.io images. The Alpine canonical
+# (../images/Dockerfile.plugin) is what the release workflow ships.
+#
+# Build args:
+#   PLUGIN_NAME   — directory name of the plugin (e.g. hc-hue, hc-yolink).
+#                   The binary name is assumed to match. Each plugin must
+#                   live as a sibling directory under the build context.
+#
+# Usage — build context should be the dir containing the plugin source
+# trees as siblings (typically the meta-layout's `plugins/` dir):
+#
+#   docker build \
+#       -f /path/to/docker/templates/Dockerfile.plugin-from-source \
+#       --build-arg PLUGIN_NAME=hc-hue \
+#       -t hc-hue:from-source \
+#       /path/to/plugins/
+#
+# Or invoke from the meta-layout's `plugins/` dir directly:
+#
+#   docker build \
+#       -f ../docker/templates/Dockerfile.plugin-from-source \
+#       --build-arg PLUGIN_NAME=hc-hue \
+#       -t hc-hue:from-source .
+#
+# Runtime mounts (post-build):
+#   /opt/plugin/config/  — bind-mount your config.toml here
+#   /opt/plugin/logs/    — optional; plugin writes structured logs here
+
+ARG PLUGIN_NAME
+
+# ---------------------------------------------------------------------------
+# Stage 1 — build
+# ---------------------------------------------------------------------------
+FROM rust:1.87-slim-bookworm AS builder
+
+ARG PLUGIN_NAME
+
+# `apt-get upgrade` first pulls CVE patches for packages baked into
+# the rust:1.87-slim-bookworm base since the upstream image was
+# last rebuilt. Defense in depth — without this, `apt-get install`
+# only refreshes the named packages.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        pkg-config \
+        libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy only the target plugin workspace — no other plugins needed.
+COPY ${PLUGIN_NAME}/ .
+
+RUN cargo build --release --bin ${PLUGIN_NAME}
+
+# ---------------------------------------------------------------------------
+# Stage 2 — runtime
+# ---------------------------------------------------------------------------
+FROM debian:bookworm-slim AS runtime
+
+ARG PLUGIN_NAME
+
+# Same `apt-get upgrade` posture as the builder — CVE patches for
+# packages baked into the debian:bookworm-slim base.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy binary
+COPY --from=builder /build/target/release/${PLUGIN_NAME} /opt/plugin/bin/plugin
+
+# Create config + log directories; config.toml is expected to be bind-mounted.
+RUN mkdir -p /opt/plugin/config /opt/plugin/logs
+
+WORKDIR /opt/plugin
+
+# Config path is the first argument to every hc-* plugin binary.
+# Default is config/config.toml relative to WORKDIR — no override needed.
+ENV RUST_LOG=info
+
+VOLUME ["/opt/plugin/config", "/opt/plugin/logs"]
+
+CMD ["/opt/plugin/bin/plugin", "config/config.toml"]
