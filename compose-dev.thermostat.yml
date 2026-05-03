@@ -1,0 +1,13 @@
+# Generic thermostat plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-thermostat-dev:
+    image: ghcr.io/homecore-io/hc-thermostat:dev
+    container_name: hc-thermostat-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-thermostat-data-dev:/homecore

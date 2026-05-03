@@ -2,7 +2,7 @@
 #
 # This compose runs hc-core on its own host; plugins run elsewhere
 # and connect to this machine's broker over the LAN. See the
-# sibling plugin-host/compose.yaml for the other end.
+# sibling plugin-host/compose.yml for the other end.
 #
 # Quick start (on host A):
 #   1. mkdir homecore-data
@@ -21,7 +21,7 @@
 
 services:
   homecore:
-    image: ghcr.io/homecore-io/hc-core:0.1.0
+    image: ghcr.io/homecore-io/hc-core:latest
     container_name: homecore
     restart: unless-stopped
     pull_policy: always

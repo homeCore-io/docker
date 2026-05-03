@@ -1,0 +1,46 @@
+# =============================================================================
+# homeCore — multi-container compose (DEVELOP-BRANCH BUILDS)
+#
+# Same shape as compose.yml but pinned to the `:dev` tag — built on every
+# push to `develop`. Use this for live-testing pre-release builds against
+# real hardware before they land in a tagged release.
+#
+# Container names and data directories carry a `-dev` suffix so a dev stack
+# can coexist with a stable stack (one host per stack — `network_mode: host`
+# means port 8080 / 1883 are claimed by whichever stack is up).
+#
+# Quick start:
+#   1. Uncomment the plugins you want under `include:`.
+#   2. mkdir homecore-data-dev
+#   3. docker compose -f compose-dev.yml up -d
+#   4. cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
+#   5. http://<host-ip>:8080
+#
+# For the stable `:latest` track, see compose.yml instead.
+# =============================================================================
+
+include:
+  # - compose-dev.hue.yml
+  # - compose-dev.sonos.yml
+  # - compose-dev.yolink.yml
+  # - compose-dev.lutron.yml
+  # - compose-dev.wled.yml
+  # - compose-dev.isy.yml
+  # - compose-dev.zwave.yml
+  # - compose-dev.caseta.yml
+  # - compose-dev.thermostat.yml
+  # - compose-dev.ecowitt.yml
+
+services:
+  homecore-dev:
+    image: ghcr.io/homecore-io/hc-core:dev
+    container_name: homecore-dev
+    restart: unless-stopped
+    # `:dev` is mutable — every develop-branch push retags it. Always
+    # pull on `up` so you actually get the latest commit's build.
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./homecore-data-dev:/homecore

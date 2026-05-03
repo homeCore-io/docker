@@ -1,5 +1,5 @@
 # Generic thermostat plugin.
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-thermostat-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-thermostat-data/config.toml. Edit, restart.
 services:
   hc-thermostat:
-    image: ghcr.io/homecore-io/hc-thermostat:0.1.0
+    image: ghcr.io/homecore-io/hc-thermostat:latest
     container_name: hc-thermostat
     restart: unless-stopped
     pull_policy: always

@@ -1,5 +1,5 @@
 # YoLink plugin (cloud API; host networking for consistency).
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-yolink-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-yolink-data/config.toml. Edit, restart.
 services:
   hc-yolink:
-    image: ghcr.io/homecore-io/hc-yolink:0.1.0
+    image: ghcr.io/homecore-io/hc-yolink:latest
     container_name: hc-yolink
     restart: unless-stopped
     pull_policy: always

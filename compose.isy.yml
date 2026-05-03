@@ -1,5 +1,5 @@
 # Universal Devices ISY plugin.
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-isy-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-isy-data/config.toml. Edit, restart.
 services:
   hc-isy:
-    image: ghcr.io/homecore-io/hc-isy:0.1.0
+    image: ghcr.io/homecore-io/hc-isy:latest
     container_name: hc-isy
     restart: unless-stopped
     pull_policy: always

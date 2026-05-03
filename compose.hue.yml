@@ -1,5 +1,5 @@
 # Philips Hue plugin.
-# Uncomment under `include:` in compose.yaml to enable.
+# Uncomment under `include:` in compose.yml to enable.
 #
 # Setup:
 #   mkdir hc-hue-data    # owner = your user; entrypoint will match
@@ -7,7 +7,7 @@
 #   First boot creates ./hc-hue-data/config.toml. Edit, restart.
 services:
   hc-hue:
-    image: ghcr.io/homecore-io/hc-hue:0.1.0
+    image: ghcr.io/homecore-io/hc-hue:latest
     container_name: hc-hue
     restart: unless-stopped
     pull_policy: always

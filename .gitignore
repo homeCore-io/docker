@@ -1,9 +1,21 @@
 # User-local state — never committed.
-# Each service bind-mounts ONE host dir; ignore them all.
+# Each service bind-mounts ONE host dir; ignore them all (stable + dev).
 homecore-data/
+homecore-data-dev/
 hc-*-data/
+hc-*-data-dev/
 
 # Legacy paths from the dual-volume era — kept ignored so existing
 # operator checkouts that still have these dirs don't see noise.
 config/
 data/
+
+# Compose env override files — may carry secrets.
+.env
+.env.local
+.env.*.local
+
+# OS / editor cruft.
+.DS_Store
+*.swp
+*~

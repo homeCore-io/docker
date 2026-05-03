@@ -8,31 +8,32 @@
 # matching `[[plugins]]` block's `enabled = true`.
 #
 # Quick start:
-#   1. docker compose -f compose.appliance.yaml up -d
+#   1. docker compose -f compose.appliance.yml up -d
 #   2. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
 #   3. http://<host-ip>:8080                          (web admin UI)
 #   4. Edit homecore-data/config/homecore.toml — set enabled = true
 #      under each [[plugins]] block you want active. Then:
-#        docker compose -f compose.appliance.yaml restart
+#        docker compose -f compose.appliance.yml restart
 #
 # After first boot, ./homecore-data/ contains config/, data/, rules/,
 # logs/, jwt_secret, INITIAL_ADMIN_PASSWORD, and a `ui` symlink. Edit
 # configs, restart, you're off.
 #
 # For the multi-container per-service shape (recommended for production
-# with many devices), see compose.yaml + the per-plugin fragments
-# instead.
+# with many devices), see compose.yml + the per-plugin fragments instead.
+#
+# This file tracks the `:latest` tag (most recent stable release). For the
+# bleeding-edge develop-branch builds, use compose-dev.appliance.yml.
 # =============================================================================
 
 services:
   homecore:
-    image: ghcr.io/homecore-io/homecore-appliance:0.1.0
+    image: ghcr.io/homecore-io/homecore-appliance:latest
     container_name: homecore-appliance
     restart: unless-stopped
     # Always check for an updated image when bringing the stack up.
-    # The mutable :dev tag changes during pre-release iteration; on
-    # tagged releases (:0.1.0 etc.) this is a cheap no-op since the
-    # tag is immutable.
+    # On tagged releases (:latest, :0.1.0) this is a cheap no-op once
+    # the local image matches the registry digest.
     pull_policy: always
 
     # The entrypoint auto-detects the bind-mount owner and drops

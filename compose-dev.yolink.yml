@@ -1,0 +1,13 @@
+# YoLink plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-yolink-dev:
+    image: ghcr.io/homecore-io/hc-yolink:dev
+    container_name: hc-yolink-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-yolink-data-dev:/homecore

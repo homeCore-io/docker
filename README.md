@@ -17,8 +17,8 @@ Two artifacts ship from this repo:
 git clone https://github.com/homeCore-io/docker.git homecore-docker
 cd homecore-docker
 
-# 1. Pick the plugins you want by uncommenting them in compose.yaml.
-$EDITOR compose.yaml
+# 1. Pick the plugins you want by uncommenting them in compose.yml.
+$EDITOR compose.yml
 
 # 2. Pre-create the per-service host dirs as your user. Each
 #    container's entrypoint detects the bind-mount owner and drops
@@ -85,7 +85,7 @@ manual config editing.
 
 | Scenario | Use |
 |---|---|
-| Everything on one machine | top-level `compose.yaml` (default quickstart above) |
+| Everything on one machine | top-level `compose.yml` (default quickstart above) |
 | hc-core on host A, plugins on host B | [`examples/multi-host/`](examples/multi-host/) |
 | Plugin-only host with hc-core elsewhere (bare metal, K8s, etc.) | [`examples/multi-host/plugin-host/`](examples/multi-host/plugin-host/) |
 
@@ -102,10 +102,18 @@ config. After that, edit the seeded `config.toml` directly.
 
 ## Versioning
 
-This repo's tags pin known-good combos of all the underlying images.
-`git checkout v0.1.0` of this repo gives you compose files that point
-at `ghcr.io/homecore-io/hc-*:0.1.0` for every service. Bump together,
-not individually.
+Three tracks ship simultaneously:
+
+| Track | Compose file | Image tag | What you get |
+|---|---|---|---|
+| Stable (default) | `compose.yml` / `compose.appliance.yml` | `:latest` | Most recent tagged release. Mutable — `docker compose pull` rolls you forward when a new release is cut. |
+| Pinned stable | check out `git checkout v0.1.0` | `:0.1.0` (set in committed files at that tag) | Reproducible — the same combination of images you got when that tag was cut, never moves. |
+| Develop | `compose-dev.yml` / `compose-dev.appliance.yml` | `:dev` | Built on every push to `develop`. Bleeding edge; expect occasional breakage. Use `homecore-data-dev/` so it doesn't collide with a stable stack. |
+
+For the dev track, container names + data dirs carry a `-dev` suffix so a
+dev stack can sit alongside a stable one (one stack at a time per host —
+`network_mode: host` claims port 8080 / 1883). Bump tracks individually,
+not images individually — this repo pins them all together.
 
 ## Building images locally
 
@@ -193,7 +201,7 @@ cd homecore-docker
 mkdir homecore-data
 
 # 2. Bring it up.
-docker compose -f compose.appliance.yaml up -d
+docker compose -f compose.appliance.yml up -d
 
 # 3. First-boot admin credentials — readable as your user.
 cat homecore-data/INITIAL_ADMIN_PASSWORD
@@ -204,15 +212,16 @@ open http://localhost:8080
 # 5. Enable the plugins you want hardware for. Edit
 #    homecore-data/config/homecore.toml — set `enabled = true`
 #    under each [[plugins]] block you want active. Then:
-docker compose -f compose.appliance.yaml restart
+docker compose -f compose.appliance.yml restart
 ```
 
-> **Pre-release tag note:** while the appliance is on the moving
-> `:dev` tag, periodically purge `homecore-data/` between major
+> **Dev-track note:** if you're running `compose-dev.appliance.yml`
+> (`:dev` tag), periodically purge `homecore-data-dev/` between major
 > entrypoint or seeded-config changes — the entrypoint only writes
 > `homecore.toml` on first boot, so changes to the bundled default
-> config don't take effect on existing data dirs. Once you're on a
-> tagged release (`:0.1.0` etc.) this isn't a concern.
+> config don't take effect on existing data dirs. The stable track
+> (`:latest`, `:0.1.0`, etc.) is immune since the seeded config only
+> changes between releases.
 
 ### Quick start with `docker run`
 
@@ -220,7 +229,7 @@ docker compose -f compose.appliance.yaml restart
 mkdir homecore-data
 docker run --rm --network host \
     -v $PWD/homecore-data:/homecore \
-    ghcr.io/homecore-io/homecore-appliance:0.1.0
+    ghcr.io/homecore-io/homecore-appliance:latest
 ```
 
 The container starts as root, looks at the bind-mount's owner,
@@ -274,8 +283,10 @@ Web UI: http://localhost:8080. First-boot admin credentials are at
 the password.
 
 The appliance image's tag matches this repo's tag — `:0.1.0` of the
-appliance bundles the `:0.1.0` of hc-core and each plugin. For test
-builds, `workflow_dispatch` the *Appliance image* workflow with custom
+appliance bundles the `:0.1.0` of hc-core and each plugin, and `:latest`
+follows the most recent stable release. The `:dev` tag is built on
+every push to the upstream `develop` branches. For ad-hoc test builds,
+`workflow_dispatch` the *Appliance image* workflow with custom
 component/appliance tags.
 
 **When NOT to use it:**

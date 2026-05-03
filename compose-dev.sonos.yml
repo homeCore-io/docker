@@ -1,0 +1,13 @@
+# Sonos plugin — DEVELOP-BRANCH BUILD (`:dev` tag).
+# Uncomment under `include:` in compose-dev.yml to enable.
+services:
+  hc-sonos-dev:
+    image: ghcr.io/homecore-io/hc-sonos:dev
+    container_name: hc-sonos-dev
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: debug
+    volumes:
+      - ./hc-sonos-data-dev:/homecore
