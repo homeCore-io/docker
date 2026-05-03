@@ -45,7 +45,12 @@ FROM ghcr.io/homecore-io/hc-ecowitt:${COMPONENT_TAG}     AS ecowitt-stage
 # ---------------------------------------------------------------------------
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tini su-exec
+# Same `apk upgrade` posture as Dockerfile.core / Dockerfile.plugin:
+# pulls CVE patches for packages baked into alpine:3.20 since the
+# base image was last rebuilt. Without this the appliance inherits
+# the worst-case freshness of any cached layer.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates tini su-exec
 
 # Binaries.
 COPY --from=core-stage       /usr/local/bin/homecore       /usr/local/bin/

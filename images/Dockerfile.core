@@ -36,10 +36,17 @@ FROM alpine:3.20
 
 ARG TARGETARCH
 
+# `apk upgrade` first to pull CVE patches for packages baked into
+# the alpine:3.20 base (busybox, musl, libssl) since the base image
+# was last rebuilt. Without this, the image inherits whatever
+# upstream digest cached in our runner — fine on the day the base
+# was bumped, increasingly stale every day after.
+#
 # ca-certificates: outbound HTTPS for plugins/notifications.
 # tini: PID-1 signal handling + zombie reaping under `docker stop`.
 # su-exec: drop privileges to bind-mount owner from the entrypoint.
-RUN apk add --no-cache ca-certificates tini su-exec
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates tini su-exec
 
 COPY homecore-${TARGETARCH}  /usr/local/bin/homecore
 COPY ui/                     /opt/homecore/ui/

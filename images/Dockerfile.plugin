@@ -37,10 +37,15 @@ FROM alpine:3.20
 ARG BINARY_NAME
 ARG TARGETARCH
 
+# `apk upgrade` first to pull CVE patches for packages baked into
+# the alpine:3.20 base (busybox, musl, libssl) since the base image
+# was last rebuilt. Same defense-in-depth pattern as Dockerfile.core.
+#
 # ca-certificates: outbound HTTPS (cloud APIs, OAuth, mDNS-over-TLS).
 # tini: PID-1 signal handling + zombie reaping under `docker stop`.
 # su-exec: drop privileges to bind-mount owner from the entrypoint.
-RUN apk add --no-cache ca-certificates tini su-exec
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates tini su-exec
 
 COPY ${BINARY_NAME}-${TARGETARCH} /usr/local/bin/${BINARY_NAME}
 COPY config.toml.example          /opt/homecore/defaults/config.toml
