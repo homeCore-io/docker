@@ -16,21 +16,22 @@ ghcr.io — those go through `../images/`.
 
 ### `Dockerfile.plugin-from-source`
 
-Generic Debian-based template that compiles any hc-* plugin from
+Generic Alpine-based template that compiles any hc-* plugin from
 source via `cargo build --release` inside the container.
-Parameterized by `PLUGIN_NAME` build arg.
+Parameterized by `PLUGIN_NAME` build arg. Multi-stage:
+`rust:alpine` builder → `alpine:3` runtime with just `ca-certificates`.
 
 Use this when:
 - you want a one-step `docker build` that produces a working
   container without prebuilding the plugin binary first;
-- the canonical Alpine path is fighting back with musl / OpenSSL
-  weirdness during local iteration;
 - you're testing an unreleased plugin source tree and don't want
   to wire it through the release workflow.
 
-Don't use this for shipping — the canonical Alpine
+Don't use this for shipping — the canonical
 `../images/Dockerfile.plugin` is what the release pipeline uses
 and what produces the reproducible, multi-arch ghcr.io images.
+That one starts from a prebuilt musl binary; this one builds in
+the container.
 
 Usage example, run from a directory containing one or more plugin
 source trees as siblings (typically the meta-layout's `plugins/`
