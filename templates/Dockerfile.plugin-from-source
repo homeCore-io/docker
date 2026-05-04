@@ -1,23 +1,24 @@
-# Dockerfile.plugin-from-source — generic Debian template for building any
-# hc-* plugin from source as a standalone container.
+# Dockerfile.plugin-from-source — generic Alpine template for building
+# any hc-* plugin from source as a standalone container.
 #
-# Differs from the canonical homeCore-io/docker/images/Dockerfile.plugin in
-# two ways:
+# Differs from the canonical homeCore-io/docker/images/Dockerfile.plugin
+# in one way:
 #
-#   1. Builds from source inside the container (cargo build), instead of
-#      copying a prebuilt musl binary that the release workflow assembled.
-#      Means you don't need to run `cargo build --release --target
-#      x86_64-unknown-linux-musl` first.
+#   - Builds from source inside the container (cargo build), instead of
+#     copying a prebuilt musl binary that the release workflow assembled.
+#     Means you don't need to run `cargo build --release --target
+#     x86_64-unknown-linux-musl` first.
 #
-#   2. Debian (rust:1.87-slim-bookworm → debian:bookworm-slim) instead of
-#      Alpine. Slightly larger images but fewer surprises around musl /
-#      OpenSSL quirks. Worth using when the canonical Alpine path fights
-#      back during local iteration.
+# Both templates are now Alpine-based (matches the rest of the project's
+# Dockerfile fleet — core/Dockerfile, every plugin's local Dockerfile,
+# and the canonical images/Dockerfile.plugin all run on alpine).
+# Earlier versions of this template were Debian/bookworm; converted to
+# Alpine 2026-05-04 to remove the divergent OS family.
 #
 # Use case: local dev — "give me a quick container of any plugin" without
 # cd'ing into each plugin's repo and running its own Dockerfile, and
 # without going through the full release pipeline. Not used by CI / not
-# used to publish ghcr.io images. The Alpine canonical
+# used to publish ghcr.io images. The canonical
 # (../images/Dockerfile.plugin) is what the release workflow ships.
 #
 # Build args:
@@ -50,20 +51,17 @@ ARG PLUGIN_NAME
 # ---------------------------------------------------------------------------
 # Stage 1 — build
 # ---------------------------------------------------------------------------
-FROM rust:1.87-slim-bookworm AS builder
+FROM rust:1.95-alpine3.23@sha256:606fd313a0f49743ee2a7bd49a0914bab7deedb12791f3a846a34a4711db7ed2 AS builder
 
 ARG PLUGIN_NAME
 
-# `apt-get upgrade` first pulls CVE patches for packages baked into
-# the rust:1.87-slim-bookworm base since the upstream image was
-# last rebuilt. Defense in depth — without this, `apt-get install`
-# only refreshes the named packages.
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        pkg-config \
-        libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
+# `apk upgrade` first pulls CVE patches for packages baked into the
+# rust:1.95-alpine3.23 base since the upstream image was last rebuilt.
+# Defense in depth — without this, `apk add --no-cache` only refreshes
+# the named packages, leaving busybox/musl/etc. on the base's frozen
+# versions. Same posture as core/Dockerfile.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache musl-dev openssl-dev pkgconfig
 
 WORKDIR /build
 
@@ -75,16 +73,14 @@ RUN cargo build --release --bin ${PLUGIN_NAME}
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime
 # ---------------------------------------------------------------------------
-FROM debian:bookworm-slim AS runtime
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS runtime
 
 ARG PLUGIN_NAME
 
-# Same `apt-get upgrade` posture as the builder — CVE patches for
-# packages baked into the debian:bookworm-slim base.
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+# Same `apk upgrade` posture as the builder — CVE patches for packages
+# baked into the alpine:3.23 base.
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates
 
 # Copy binary
 COPY --from=builder /build/target/release/${PLUGIN_NAME} /opt/plugin/bin/plugin

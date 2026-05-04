@@ -43,10 +43,10 @@ FROM ghcr.io/homecore-io/hc-ecowitt:${COMPONENT_TAG}     AS ecowitt-stage
 # ---------------------------------------------------------------------------
 # Runtime stage
 # ---------------------------------------------------------------------------
-FROM alpine:3.20
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
 # Same `apk upgrade` posture as Dockerfile.core / Dockerfile.plugin:
-# pulls CVE patches for packages baked into alpine:3.20 since the
+# pulls CVE patches for packages baked into alpine:3.23 since the
 # base image was last rebuilt. Without this the appliance inherits
 # the worst-case freshness of any cached layer.
 RUN apk upgrade --no-cache && \
@@ -90,6 +90,17 @@ COPY --from=ecowitt-stage    /opt/homecore/defaults/config.toml /opt/homecore/de
 # `dist_path = "ui"` and matches the single-base-dir layout the entrypoint
 # creates. Seeded into $HOMECORE_HOME/config/homecore.toml on first boot.
 COPY images/homecore.appliance.toml /opt/homecore/defaults/homecore.toml
+
+# Bill-of-materials — written by the appliance-release workflow's
+# `Build versions.json` step. Records exact resolved version of every
+# bundled component (appliance + core + 10 plugins) plus the build
+# timestamp. Surfaced over HTTP via core's GET /system/versions handler.
+# component_versioning.md Phase A.
+#
+# A placeholder `versions.json` is committed to the repo root so local
+# `docker build` invocations (outside the workflow) succeed; the workflow
+# overwrites it with real resolved versions before building.
+COPY versions.json /opt/homecore/versions.json
 
 COPY images/appliance-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
