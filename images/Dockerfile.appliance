@@ -91,6 +91,17 @@ COPY --from=ecowitt-stage    /opt/homecore/defaults/config.toml /opt/homecore/de
 # creates. Seeded into $HOMECORE_HOME/config/homecore.toml on first boot.
 COPY images/homecore.appliance.toml /opt/homecore/defaults/homecore.toml
 
+# Bill-of-materials — written by the appliance-release workflow's
+# `Build versions.json` step. Records exact resolved version of every
+# bundled component (appliance + core + 10 plugins) plus the build
+# timestamp. Surfaced over HTTP via core's GET /system/versions handler.
+# component_versioning.md Phase A.
+#
+# A placeholder `versions.json` is committed to the repo root so local
+# `docker build` invocations (outside the workflow) succeed; the workflow
+# overwrites it with real resolved versions before building.
+COPY versions.json /opt/homecore/versions.json
+
 COPY images/appliance-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

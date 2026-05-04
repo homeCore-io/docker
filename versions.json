@@ -1,0 +1,5 @@
+{
+  "_note": "Placeholder bill-of-materials for local docker builds. The appliance-release.yml workflow overwrites this file with resolved component versions before building the image. component_versioning.md Phase A.",
+  "appliance": "local-build",
+  "built_at": "0000-00-00T00:00:00Z"
+}

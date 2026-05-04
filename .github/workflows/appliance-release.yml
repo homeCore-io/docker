@@ -65,16 +65,101 @@ jobs:
               VERSION="${GITHUB_REF_NAME#v}"
               COMPONENT_TAG="latest"
               APPLIANCE_TAGS=$(printf '%s\n%s' "${BASE}:${VERSION}" "${BASE}:latest")
+              APPLIANCE_VERSION="${VERSION}"
           else
               COMPONENT_TAG="${{ inputs.component_tag }}"
               APPLIANCE_TAGS="${BASE}:${{ inputs.appliance_tag }}"
+              APPLIANCE_VERSION="${{ inputs.appliance_tag }}"
           fi
           {
               echo "component_tag=${COMPONENT_TAG}"
+              echo "appliance_version=${APPLIANCE_VERSION}"
+              echo "owner=${OWNER}"
               echo "appliance_tags<<EOTAGS"
               echo "${APPLIANCE_TAGS}"
               echo "EOTAGS"
           } >> "$GITHUB_OUTPUT"
+
+      # Build /opt/homecore/versions.json — bill-of-materials baked into
+      # the appliance image at build time. component_versioning.md Phase A.
+      #
+      # For each component image at COMPONENT_TAG, resolve to the most
+      # specific tag we can find:
+      #   - If COMPONENT_TAG is already SemVer-shaped (X.Y.Z), use as-is.
+      #   - Else query ghcr for sibling tags on the same digest and prefer:
+      #       1. a SemVer tag (so `:latest` → `0.1.2`)
+      #       2. an immutable dev tag (so `:dev` → `dev-<sha>`)
+      #       3. fallback to COMPONENT_TAG itself
+      #
+      # Server-side handler: crates/hc-api/src/handlers.rs::system_versions
+      # reads this file and exposes via GET /system/versions.
+      - name: Build versions.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ steps.tags.outputs.owner }}
+          COMPONENT_TAG: ${{ steps.tags.outputs.component_tag }}
+          APPLIANCE_VERSION: ${{ steps.tags.outputs.appliance_version }}
+        run: |
+          set -eu
+
+          # Resolve $1=component, $2=tag → the most specific version we can find.
+          resolve_version() {
+              local component="$1"
+              local tag="$2"
+              # Fast path: tag is already a SemVer.
+              if echo "$tag" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                  echo "$tag"
+                  return
+              fi
+              # Query sibling tags on the same digest as $tag.
+              local siblings
+              siblings=$(gh api \
+                  "/orgs/${OWNER}/packages/container/${component}/versions" \
+                  --jq '.[] | select(.metadata.container.tags | index("'"$tag"'")) | .metadata.container.tags[]' \
+                  2>/dev/null || true)
+              # Prefer SemVer.
+              local semver
+              semver=$(echo "$siblings" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              if [ -n "$semver" ]; then
+                  echo "$semver"
+                  return
+              fi
+              # Else prefer an immutable dev-<sha> tag.
+              local dev_immutable
+              dev_immutable=$(echo "$siblings" | grep -E '^dev-[0-9a-f]+$' | head -1 || true)
+              if [ -n "$dev_immutable" ]; then
+                  echo "$dev_immutable"
+                  return
+              fi
+              # Last resort: the requested tag itself.
+              echo "$tag"
+          }
+
+          components="hc-core hc-hue hc-wled hc-yolink hc-lutron hc-sonos hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
+
+          # Start the JSON with appliance metadata.
+          BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # Resolve appliance version too (in case dispatch uses a non-SemVer tag).
+          APPLIANCE_RESOLVED=$(resolve_version homecore-appliance "$APPLIANCE_VERSION")
+          jq -n \
+              --arg appliance "$APPLIANCE_RESOLVED" \
+              --arg built_at "$BUILT_AT" \
+              '{appliance: $appliance, built_at: $built_at, plugins: {}}' > versions.json
+
+          # Add core + each plugin's resolved version. core lives at top
+          # level; plugins live under .plugins.<name>.
+          for c in $components; do
+              v=$(resolve_version "$c" "$COMPONENT_TAG")
+              if [ "$c" = "hc-core" ]; then
+                  jq --arg v "$v" '.core = $v' versions.json > versions.json.tmp
+              else
+                  jq --arg c "$c" --arg v "$v" '.plugins[$c] = $v' versions.json > versions.json.tmp
+              fi
+              mv versions.json.tmp versions.json
+          done
+
+          echo "Built versions.json:"
+          cat versions.json
 
       # FORCE_FAST: `if: false` skips QEMU; revert to `!inputs.fast`.
       - name: Set up QEMU
