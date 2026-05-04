@@ -32,13 +32,13 @@
 
 ARG BINARY_NAME
 
-FROM alpine:3.20
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 
 ARG BINARY_NAME
 ARG TARGETARCH
 
 # `apk upgrade` first to pull CVE patches for packages baked into
-# the alpine:3.20 base (busybox, musl, libssl) since the base image
+# the alpine:3.23 base (busybox, musl, libssl) since the base image
 # was last rebuilt. Same defense-in-depth pattern as Dockerfile.core.
 #
 # ca-certificates: outbound HTTPS (cloud APIs, OAuth, mDNS-over-TLS).
