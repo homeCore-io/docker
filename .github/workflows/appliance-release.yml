@@ -49,11 +49,12 @@ on:
 
 # A burst of component pushes (e.g. SDK fanout dispatching 10 plugins)
 # would otherwise queue 10 appliance builds against the same :dev tags.
-# Coalesce: same group key for every dev cascade; the newer dispatch
-# cancels the queued/running older one.
+# Coalesce: any dispatch with component_tag=dev shares a group key, and
+# newer dispatches cancel older queued/running ones. Tag pushes get a
+# separate group keyed on the tag ref so they never cancel each other.
 concurrency:
-  group: appliance-${{ github.event_name == 'repository_dispatch' && 'dev' || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'repository_dispatch' }}
+  group: appliance-${{ (github.event_name == 'workflow_dispatch' && inputs.appliance_tag == 'dev') || github.event_name == 'repository_dispatch' && 'dev' || github.ref }}
+  cancel-in-progress: ${{ (github.event_name == 'workflow_dispatch' && inputs.appliance_tag == 'dev') || github.event_name == 'repository_dispatch' }}
 
 permissions:
   contents: read
