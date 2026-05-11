@@ -2,8 +2,16 @@
 # ghcr.io/homecore-io/homecore-appliance.
 #
 # Triggers:
-#   - workflow_dispatch  → tags via inputs (use for ad-hoc test builds)
-#   - tag push (v*)       → component_tag and appliance_tag both = stripped ref
+#   - workflow_dispatch       → tags via inputs (use for ad-hoc test builds)
+#   - tag push (v*)            → component_tag and appliance_tag both = stripped ref
+#   - repository_dispatch     → component-dev-published, fired by each
+#                                component's rust-release.yml after a
+#                                develop-branch :dev image goes live.
+#                                Builds with component_tag=dev,
+#                                appliance_tag=dev. Concurrency below
+#                                collapses bursts (e.g. SDK fanout
+#                                firing all 10 plugins) into a single
+#                                build.
 #
 # Per-component images (hc-core + 10 plugins) are pulled FROM ghcr.io
 # at COMPONENT_TAG; binaries are extracted and bundled into a single
@@ -36,6 +44,16 @@ on:
         default: false
   push:
     tags: ['v*']
+  repository_dispatch:
+    types: [component-dev-published]
+
+# A burst of component pushes (e.g. SDK fanout dispatching 10 plugins)
+# would otherwise queue 10 appliance builds against the same :dev tags.
+# Coalesce: same group key for every dev cascade; the newer dispatch
+# cancels the queued/running older one.
+concurrency:
+  group: appliance-${{ github.event_name == 'repository_dispatch' && 'dev' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'repository_dispatch' }}
 
 permissions:
   contents: read
@@ -66,6 +84,13 @@ jobs:
               COMPONENT_TAG="latest"
               APPLIANCE_TAGS=$(printf '%s\n%s' "${BASE}:${VERSION}" "${BASE}:latest")
               APPLIANCE_VERSION="${VERSION}"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+              # Cascade from a component's develop push: always rebuild
+              # the rolling :dev tag from :dev components. Triggering
+              # component sits in the run name (set below).
+              COMPONENT_TAG="dev"
+              APPLIANCE_TAGS="${BASE}:dev"
+              APPLIANCE_VERSION="dev"
           else
               COMPONENT_TAG="${{ inputs.component_tag }}"
               APPLIANCE_TAGS="${BASE}:${{ inputs.appliance_tag }}"
@@ -84,11 +109,15 @@ jobs:
       # the appliance image at build time. component_versioning.md Phase A.
       #
       # For each component image at COMPONENT_TAG, resolve to the most
-      # specific tag we can find:
+      # specific identifier we can find:
       #   - If COMPONENT_TAG is already SemVer-shaped (X.Y.Z), use as-is.
       #   - Else query ghcr for sibling tags on the same digest and prefer:
       #       1. a SemVer tag (so `:latest` → `0.1.2`)
-      #       2. an immutable dev tag (so `:dev` → `dev-<sha>`)
+      #       2. `<tag>@<digest>` (so `:dev` → `dev@sha256:abcd…`).
+      #          We pin the digest rather than the mutable `dev-<sha>`
+      #          sibling because cleanup-containers.yml may GC dev-<sha>
+      #          tags outside its keep-window, leaving versions.json
+      #          referencing a 404. The OCI digest is immutable.
       #       3. fallback to COMPONENT_TAG itself
       #
       # Server-side handler: crates/hc-api/src/handlers.rs::system_versions
@@ -111,24 +140,27 @@ jobs:
                   echo "$tag"
                   return
               fi
-              # Query sibling tags on the same digest as $tag.
-              local siblings
-              siblings=$(gh api \
+              # Query versions whose tags include $tag — there should be
+              # exactly one. Grab the OCI digest (.name) and the full
+              # tags list in one shot.
+              local row digest siblings
+              row=$(gh api \
                   "/orgs/${OWNER}/packages/container/${component}/versions" \
-                  --jq '.[] | select(.metadata.container.tags | index("'"$tag"'")) | .metadata.container.tags[]' \
-                  2>/dev/null || true)
-              # Prefer SemVer.
+                  --jq '.[] | select(.metadata.container.tags | index("'"$tag"'")) | "\(.name)|\(.metadata.container.tags|join(","))"' \
+                  2>/dev/null | head -1 || true)
+              digest="${row%%|*}"
+              siblings="${row#*|}"
+              # Prefer SemVer when present (e.g. :latest → 0.1.5).
               local semver
-              semver=$(echo "$siblings" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              semver=$(echo "$siblings" | tr ',' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
               if [ -n "$semver" ]; then
                   echo "$semver"
                   return
               fi
-              # Else prefer an immutable dev-<sha> tag.
-              local dev_immutable
-              dev_immutable=$(echo "$siblings" | grep -E '^dev-[0-9a-f]+$' | head -1 || true)
-              if [ -n "$dev_immutable" ]; then
-                  echo "$dev_immutable"
+              # Else pin the digest. Immutable, survives cleanup of
+              # mutable sibling tags. Format: `<tag>@sha256:…`
+              if [ -n "$digest" ]; then
+                  echo "${tag}@${digest}"
                   return
               fi
               # Last resort: the requested tag itself.
