@@ -1,16 +1,17 @@
 # =============================================================================
 # homeCore — multi-container compose
 #
-# This is the BASE file. It runs only hc-core (with the embedded MQTT broker).
-# Add plugins by uncommenting them in the `include:` block below.
+# Runs hc-core (embedded MQTT broker + Leptos UI) as a container. Plugins are
+# NOT separate containers — install them at runtime from the web UI (Plugins →
+# Add), which pulls signed artifacts from the plugin registry and runs each as
+# a managed child of hc-core.
 #
 # Quick start:
-#   1. Uncomment the plugins you want under `include:`.
-#   2. mkdir homecore-data && (optionally chown $(id -u):$(id -g) homecore-data)
-#   3. docker compose up -d
-#   4. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
-#   5. http://<host-ip>:8080                          (web admin UI)
-#   6. docker compose restart                          (after editing configs)
+#   1. mkdir homecore-data && (optionally chown $(id -u):$(id -g) homecore-data)
+#   2. docker compose up -d
+#   3. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
+#   4. http://<host-ip>:8080                          (web admin UI)
+#   5. In the UI: Plugins → Add → install what your hardware needs.
 #
 # Single-bind-mount layout per service. Each container bind-mounts ONE host
 # directory to /homecore; the entrypoint detects the owner and drops
@@ -26,18 +27,6 @@
 # This file tracks the `:latest` tag (most recent stable release). For the
 # bleeding-edge develop-branch builds, use compose-dev.yml instead.
 # =============================================================================
-
-include:
-  # - compose.hue.yml
-  # - compose.sonos.yml
-  # - compose.yolink.yml
-  # - compose.lutron.yml
-  # - compose.wled.yml
-  # - compose.isy.yml
-  # - compose.zwave.yml
-  # - compose.caseta.yml
-  # - compose.thermostat.yml
-  # - compose.ecowitt.yml
 
 services:
   homecore:

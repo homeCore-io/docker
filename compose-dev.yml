@@ -9,27 +9,17 @@
 # can coexist with a stable stack (one host per stack — `network_mode: host`
 # means port 8080 / 1883 are claimed by whichever stack is up).
 #
+# Plugins install at runtime from the registry via the UI — not as separate
+# containers.
+#
 # Quick start:
-#   1. Uncomment the plugins you want under `include:`.
-#   2. mkdir homecore-data-dev
-#   3. docker compose -f compose-dev.yml up -d
-#   4. cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
-#   5. http://<host-ip>:8080
+#   1. mkdir homecore-data-dev
+#   2. docker compose -f compose-dev.yml up -d
+#   3. cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
+#   4. http://<host-ip>:8080  →  Plugins → Add
 #
 # For the stable `:latest` track, see compose.yml instead.
 # =============================================================================
-
-include:
-  # - compose-dev.hue.yml
-  # - compose-dev.sonos.yml
-  # - compose-dev.yolink.yml
-  # - compose-dev.lutron.yml
-  # - compose-dev.wled.yml
-  # - compose-dev.isy.yml
-  # - compose-dev.zwave.yml
-  # - compose-dev.caseta.yml
-  # - compose-dev.thermostat.yml
-  # - compose-dev.ecowitt.yml
 
 services:
   homecore-dev:
