@@ -2,11 +2,10 @@
 # quick testing. NOT the recommended distribution shape (use the
 # multi-container compose flow for that — see ../README.md).
 #
-# Bundles hc-core (with embedded broker + Leptos UI) AND every
-# CI-active plugin into a single image. The entrypoint enables the
-# subset of plugins listed in $HC_PLUGINS at runtime, so one image
-# covers every "give me homeCore plus these plugins" combo without
-# rebuilding.
+# Bundles hc-core (embedded broker + Leptos UI). Plugins are NOT baked
+# in — they install at runtime from the plugin registry (via the UI),
+# so one image serves every plugin combination and the appliance build
+# no longer depends on any plugin image.
 #
 # Single bind-mount layout: everything operator-mutable lives under
 # $HOMECORE_HOME (default /homecore). One volume to mount, one place
@@ -24,21 +23,11 @@
 ARG COMPONENT_TAG=latest
 
 # ---------------------------------------------------------------------------
-# Source stages — pull binaries from each per-component image.
-# buildx resolves each FROM via the component's multi-arch manifest, so
-# `--platform linux/amd64,linux/arm64` builds get the right arch from each.
+# Source stage — pull the core binary + UI from the hc-core image. Plugins are
+# NOT baked in anymore: they install at runtime from the plugin registry, so
+# the appliance no longer depends on any plugin image existing.
 # ---------------------------------------------------------------------------
-FROM ghcr.io/homecore-io/hc-core:${COMPONENT_TAG}        AS core-stage
-FROM ghcr.io/homecore-io/hc-hue:${COMPONENT_TAG}         AS hue-stage
-FROM ghcr.io/homecore-io/hc-wled:${COMPONENT_TAG}        AS wled-stage
-FROM ghcr.io/homecore-io/hc-yolink:${COMPONENT_TAG}      AS yolink-stage
-FROM ghcr.io/homecore-io/hc-lutron:${COMPONENT_TAG}      AS lutron-stage
-FROM ghcr.io/homecore-io/hc-sonos:${COMPONENT_TAG}       AS sonos-stage
-FROM ghcr.io/homecore-io/hc-isy:${COMPONENT_TAG}         AS isy-stage
-FROM ghcr.io/homecore-io/hc-zwave:${COMPONENT_TAG}       AS zwave-stage
-FROM ghcr.io/homecore-io/hc-caseta:${COMPONENT_TAG}      AS caseta-stage
-FROM ghcr.io/homecore-io/hc-thermostat:${COMPONENT_TAG}  AS thermostat-stage
-FROM ghcr.io/homecore-io/hc-ecowitt:${COMPONENT_TAG}     AS ecowitt-stage
+FROM ghcr.io/homecore-io/hc-core:${COMPONENT_TAG} AS core-stage
 
 # ---------------------------------------------------------------------------
 # Runtime stage
@@ -52,38 +41,15 @@ FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a50
 RUN apk upgrade --no-cache && \
     apk add --no-cache ca-certificates tini su-exec
 
-# Binaries.
-COPY --from=core-stage       /usr/local/bin/homecore       /usr/local/bin/
-COPY --from=hue-stage        /usr/local/bin/hc-hue         /usr/local/bin/
-COPY --from=wled-stage       /usr/local/bin/hc-wled        /usr/local/bin/
-COPY --from=yolink-stage     /usr/local/bin/hc-yolink      /usr/local/bin/
-COPY --from=lutron-stage     /usr/local/bin/hc-lutron      /usr/local/bin/
-COPY --from=sonos-stage      /usr/local/bin/hc-sonos       /usr/local/bin/
-COPY --from=isy-stage        /usr/local/bin/hc-isy         /usr/local/bin/
-COPY --from=zwave-stage      /usr/local/bin/hc-zwave       /usr/local/bin/
-COPY --from=caseta-stage     /usr/local/bin/hc-caseta      /usr/local/bin/
-COPY --from=thermostat-stage /usr/local/bin/hc-thermostat  /usr/local/bin/
-COPY --from=ecowitt-stage    /usr/local/bin/hc-ecowitt     /usr/local/bin/
+# Core binary only. Plugin binaries are downloaded into
+# $HOMECORE_HOME/plugins/<id>/<version>/ at runtime by the registry installer.
+COPY --from=core-stage /usr/local/bin/homecore /usr/local/bin/
 
 # Leptos WASM bundle — baked at /opt/homecore/ui (outside the volume so
 # image layers persist after mount). Entrypoint creates a `ui` symlink
 # at $HOMECORE_HOME/ui pointing here, so the seeded config's
 # `dist_path = "ui"` resolves correctly.
 COPY --from=core-stage /opt/homecore/ui /opt/homecore/ui
-
-# Per-plugin default configs from each component's image. Entrypoint
-# seeds these into $HOMECORE_HOME/config/<plugin>/config.toml on first
-# boot for the subset of plugins in $HC_PLUGINS.
-COPY --from=hue-stage        /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-hue/config.toml
-COPY --from=wled-stage       /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-wled/config.toml
-COPY --from=yolink-stage     /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-yolink/config.toml
-COPY --from=lutron-stage     /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-lutron/config.toml
-COPY --from=sonos-stage      /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-sonos/config.toml
-COPY --from=isy-stage        /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-isy/config.toml
-COPY --from=zwave-stage      /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-zwave/config.toml
-COPY --from=caseta-stage     /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-caseta/config.toml
-COPY --from=thermostat-stage /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-thermostat/config.toml
-COPY --from=ecowitt-stage    /opt/homecore/defaults/config.toml /opt/homecore/defaults/hc-ecowitt/config.toml
 
 # Appliance-flavor core config — overrides the generic homecore.toml.example
 # baked into hc-core's image. This one has [web_admin] enabled with
@@ -93,7 +59,7 @@ COPY images/homecore.appliance.toml /opt/homecore/defaults/homecore.toml
 
 # Bill-of-materials — written by the appliance-release workflow's
 # `Build versions.json` step. Records exact resolved version of every
-# bundled component (appliance + core + 10 plugins) plus the build
+# bundled component (appliance + core) plus the build
 # timestamp. Surfaced over HTTP via core's GET /system/versions handler.
 # component_versioning.md Phase A.
 #

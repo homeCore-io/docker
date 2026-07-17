@@ -54,9 +54,6 @@ DATA_DIR="$HOME_DIR/data"
 RULES_DIR="$HOME_DIR/rules"
 CORE_CONFIG="$CONFIG_DIR/homecore.toml"
 
-BUNDLED_PLUGINS="hc-hue hc-wled hc-yolink hc-lutron hc-sonos \
-                 hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
-
 mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$RULES_DIR"
 
 # ─── Seed core config ───────────────────────────────────────────────
@@ -65,23 +62,8 @@ if [ ! -f "$CORE_CONFIG" ]; then
     echo "[appliance] seeded core config at $CORE_CONFIG"
 fi
 
-# ─── Seed per-plugin configs (regardless of enabled state) ──────────
-for p in $BUNDLED_PLUGINS; do
-    plugin_default="$DEFAULTS_DIR/$p/config.toml"
-    plugin_config_dir="$CONFIG_DIR/$p"
-    plugin_config="$plugin_config_dir/config.toml"
-
-    if [ ! -f "$plugin_default" ]; then
-        echo "[appliance] WARN: $p has no bundled default ($plugin_default missing)" >&2
-        continue
-    fi
-
-    if [ ! -f "$plugin_config" ]; then
-        mkdir -p "$plugin_config_dir"
-        cp "$plugin_default" "$plugin_config"
-        echo "[appliance] seeded $p config at $plugin_config"
-    fi
-done
+# Plugins are installed at runtime from the registry (their config lives under
+# $HOMECORE_HOME/plugins/<id>/), so there are no bundled plugin configs to seed.
 
 # ─── Start hc-core ──────────────────────────────────────────────────
 echo "[appliance] starting hc-core with home=$HOME_DIR"

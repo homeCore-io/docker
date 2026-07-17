@@ -13,10 +13,10 @@
 #                                firing all 10 plugins) into a single
 #                                build.
 #
-# Per-component images (hc-core + 10 plugins) are pulled FROM ghcr.io
-# at COMPONENT_TAG; binaries are extracted and bundled into a single
-# alpine runtime layer. Multi-arch (linux/amd64 + linux/arm64) via the
-# component manifests — buildx picks the right arch automatically.
+# The hc-core image is pulled FROM ghcr.io at COMPONENT_TAG; its binary +
+# UI are bundled into a single alpine runtime layer. Plugins are NOT bundled
+# — they install at runtime from the plugin registry — so the appliance no
+# longer depends on any plugin image. Multi-arch via the core manifest.
 
 name: Appliance image
 
@@ -168,7 +168,11 @@ jobs:
               echo "$tag"
           }
 
-          components="hc-core hc-hue hc-wled hc-yolink hc-lutron hc-sonos hc-isy hc-zwave hc-caseta hc-thermostat hc-ecowitt"
+          # Plugins are no longer bundled — they install at runtime from the
+          # registry — so the appliance depends only on core and its BOM tracks
+          # only core. (.plugins stays empty; runtime installs are tracked by
+          # core's managed-plugin records, not the image BOM.)
+          components="hc-core"
 
           # Start the JSON with appliance metadata.
           BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)

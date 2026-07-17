@@ -80,80 +80,18 @@ prune_after_days = 5
 format           = "json"
 
 # ---------------------------------------------------------------------------
-# Plugins — all bundled, all disabled by default.
+# Plugin registry — where the UI installs plugins from.
 #
-# Every plugin binary the appliance image ships with is declared here.
-# Set `enabled = true` on the ones your hardware actually has, then
-# restart the container; hc-core spawns each enabled plugin as a
-# managed child process.
+# Plugins are NOT bundled in the appliance image. Install them at runtime from
+# the UI (Plugins → Add): hc-core downloads the signed artifact from this
+# registry, verifies it, and spawns the plugin as a managed child. Installed
+# plugins live under $HOMECORE_HOME/plugins/<id>/<version>/ and persist across
+# restarts.
 #
-# The per-plugin config files at config/<plugin>/config.toml are
-# seeded on first boot, so each plugin has working defaults the
-# moment you enable it. Edit them through the admin UI or directly.
+# `public_key` is the base64 ed25519 key the registry index is signed with —
+# the appliance only installs plugins signed by it. Point `url` at your own
+# registry (any static host serving index.json + index.json.sig) to self-host.
 # ---------------------------------------------------------------------------
-
-# `id` here MUST match the plugin's self-registered MQTT plugin_id —
-# the value of `plugin_id` in each plugin's own config.toml. Convention
-# is `plugin.<name>`. If they don't match, hc-core's spawn-tracking
-# entry and the plugin's MQTT-registration entry land in the registry
-# under different keys and the UI shows the plugin twice.
-
-[[plugins]]
-id      = "plugin.hue"
-binary  = "/usr/local/bin/hc-hue"
-config  = "config/hc-hue/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.wled"
-binary  = "/usr/local/bin/hc-wled"
-config  = "config/hc-wled/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.yolink"
-binary  = "/usr/local/bin/hc-yolink"
-config  = "config/hc-yolink/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.lutron"
-binary  = "/usr/local/bin/hc-lutron"
-config  = "config/hc-lutron/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.sonos"
-binary  = "/usr/local/bin/hc-sonos"
-config  = "config/hc-sonos/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.isy"
-binary  = "/usr/local/bin/hc-isy"
-config  = "config/hc-isy/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.zwave"
-binary  = "/usr/local/bin/hc-zwave"
-config  = "config/hc-zwave/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.caseta"
-binary  = "/usr/local/bin/hc-caseta"
-config  = "config/hc-caseta/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.thermostat"
-binary  = "/usr/local/bin/hc-thermostat"
-config  = "config/hc-thermostat/config.toml"
-enabled = false
-
-[[plugins]]
-id      = "plugin.ecowitt"
-binary  = "/usr/local/bin/hc-ecowitt"
-config  = "config/hc-ecowitt/config.toml"
-enabled = false
+[registry]
+url        = "https://homecore.io/registry/index.json"
+public_key = "d64zXOo99GE+uYAPbtbIwLUJHtBaACJB73cUppj93I8="

@@ -1,19 +1,17 @@
 # =============================================================================
 # homeCore — appliance compose
 #
-# All-in-one container: hc-core (with embedded MQTT broker + Leptos UI)
-# plus every CI-active plugin BAKED INTO THE IMAGE. Every plugin starts
-# disabled. To turn on the ones your hardware supports, edit
-# `homecore-data/config/homecore.toml` (after first boot) and flip the
-# matching `[[plugins]]` block's `enabled = true`.
+# All-in-one container: hc-core (embedded MQTT broker + Leptos UI). Plugins
+# are NOT baked into the image — install the ones your hardware needs at
+# runtime from the web UI (Plugins → Add), which pulls signed artifacts from
+# the plugin registry and runs each as a managed child of hc-core. No image
+# rebuild and no static [[plugins]] blocks to enable.
 #
 # Quick start:
 #   1. docker compose -f compose.appliance.yml up -d
 #   2. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
 #   3. http://<host-ip>:8080                          (web admin UI)
-#   4. Edit homecore-data/config/homecore.toml — set enabled = true
-#      under each [[plugins]] block you want active. Then:
-#        docker compose -f compose.appliance.yml restart
+#   4. In the UI: Plugins → Add → install what your hardware needs.
 #
 # After first boot, ./homecore-data/ contains config/, data/, rules/,
 # logs/, jwt_secret, INITIAL_ADMIN_PASSWORD, and a `ui` symlink. Edit
