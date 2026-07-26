@@ -30,6 +30,39 @@ if [ "$(id -u)" = "0" ]; then
         echo "[hc-core] bind-mount was root-owned; chowned $HOME_DIR to $target_uid:$target_gid"
     fi
 
+    # Adopt subdirectories Docker created for us.
+    #
+    # Docker materialises the PARENT of every bind-mount before this script
+    # runs, and does it as root. So `-v ./homecore.toml:/homecore/config/homecore.toml:ro`
+    # — which is how every compose file here ships a config — leaves
+    # /homecore/config owned by root:root even though /homecore itself belongs
+    # to the operator. The block above does not catch it: it only looks at
+    # $HOME_DIR, which is correctly owned.
+    #
+    # Core then runs as the mount owner and cannot create config/plugins,
+    # config/profiles or config/calendars inside a root-owned directory. It
+    # warns about each, carries on, and dies a moment later with
+    #
+    #   Error: No such file or directory (os error 2) about ["/homecore/config/plugins"]
+    #
+    # from the plugin-config watcher — an error that names the symptom and not
+    # one word about the permissions that caused it.
+    #
+    # Non-recursive on purpose. The read-only config file inside is root-owned
+    # and must stay that way; core only reads it, and chown would fail on a
+    # read-only mount anyway.
+    for d in "$HOME_DIR"/*; do
+        [ -d "$d" ] || continue
+        owner=$(stat -c '%u' "$d")
+        if [ "$owner" != "$target_uid" ]; then
+            if chown "$target_uid:$target_gid" "$d" 2>/dev/null; then
+                echo "[hc-core] adopted $d (was uid $owner, now $target_uid)"
+            else
+                echo "[hc-core] WARNING: $d is owned by uid $owner and could not be chowned; core may not be able to write in it"
+            fi
+        fi
+    done
+
     echo "[hc-core] dropping privileges to $target_uid:$target_gid"
     exec su-exec "$target_uid:$target_gid" "$0" "$@"
 fi
