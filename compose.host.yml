@@ -1,0 +1,63 @@
+# =============================================================================
+# homeCore — the stack, on host networking.
+#
+# Same two containers as compose.yml. The difference is `network_mode: host`,
+# and the reason is discovery.
+#
+# Hue, Sonos, WLED and Roku find devices with mDNS and SSDP — multicast, which
+# a Docker bridge network does not forward. On compose.yml those plugins install
+# and run, then find nothing. Sonos additionally serves UPnP event callbacks on
+# :5005 and has to advertise an address the speakers can actually reach back on,
+# which a NATed container IP is not.
+#
+# So: use this file if you have Hue, Sonos, WLED or Roku, or if auto-discovery
+# turned up empty on the bridge setup. Use compose.yml otherwise — it is the
+# simpler thing and it isolates the containers properly.
+#
+# What host mode changes:
+#   - No `ports:` mappings. Every listener lands straight on the host, so
+#     hc-web takes WEB_PORT=3000 rather than being mapped there.
+#   - hc-web reaches core at 127.0.0.1 — there is no compose DNS on host
+#     networking, so the `homecore` service name does not resolve.
+#   - The containers share the host's network namespace. Port conflicts are
+#     real: if something else on this host owns 3000 or 8080, change WEB_PORT
+#     or [server] port rather than expecting Docker to remap it.
+#
+# Quick start:
+#   mkdir homecore-data
+#   docker compose -f compose.host.yml up -d
+#   cat homecore-data/INITIAL_ADMIN_PASSWORD
+#   open http://<host-ip>:3000
+#
+# Linux only. Docker Desktop on macOS and Windows runs containers in a VM, so
+# `network_mode: host` does not give access to the LAN's multicast traffic and
+# this file will not do what it is for.
+# =============================================================================
+
+services:
+  homecore:
+    image: ghcr.io/homecore-io/hc-core:latest
+    container_name: homecore
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./homecore-data:/homecore
+      - ./homecore.toml:/homecore/config/homecore.toml:ro
+
+  hc-web:
+    image: ghcr.io/homecore-io/hc-web:latest
+    container_name: hc-web
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    depends_on:
+      - homecore
+    environment:
+      # No compose DNS on the host network — core is simply on this host.
+      HOMECORE_URL: http://127.0.0.1:8080
+      # nginx listens here directly. With no port mapping to remap, the
+      # container cannot sit on 80 without owning the host's port 80.
+      WEB_PORT: 3000

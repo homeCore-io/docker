@@ -1,31 +1,45 @@
 # =============================================================================
-# homeCore — multi-container compose
+# homeCore — the stack. Stable (`:latest`) track.
 #
-# Runs hc-core (embedded MQTT broker + Leptos UI) as a container. Plugins are
-# NOT separate containers — install them at runtime from the web UI (Plugins →
-# Add), which pulls signed artifacts from the plugin registry and runs each as
-# a managed child of hc-core.
+# Two containers:
+#
+#   homecore   hc-core — the REST/WebSocket API and the embedded MQTT broker.
+#              No UI, no baked-in plugins.
+#
+#   hc-web     the Flutter web UI. nginx inside this image serves the app AND
+#              reverse-proxies /api/v1/* — including the WebSocket and SSE
+#              streams — to homecore. That proxy is not a convenience: the app
+#              calls /api/v1 as a RELATIVE path and core sends no CORS headers,
+#              so the API has to be same-origin with the app or nothing works.
+#
+# Plugins are NOT containers. Install them from the UI (Plugins → Add) and core
+# pulls a signed artifact from the plugin registry, verifies it, and runs it as
+# a child process. Adding hardware support never means editing this file.
+#
+#   browser ─▶ hc-web:3000 ─┬─ /           the Flutter app
+#                           └─ /api/v1/* ─▶ homecore:8080
 #
 # Quick start:
-#   1. mkdir homecore-data && (optionally chown $(id -u):$(id -g) homecore-data)
-#   2. docker compose up -d
-#   3. cat homecore-data/INITIAL_ADMIN_PASSWORD       (first-boot creds)
-#   4. http://<host-ip>:8080                          (web admin UI)
-#   5. In the UI: Plugins → Add → install what your hardware needs.
+#   mkdir homecore-data
+#   docker compose up -d
+#   cat homecore-data/INITIAL_ADMIN_PASSWORD     # first-boot admin creds
+#   open http://<host-ip>:3000
 #
-# Single-bind-mount layout per service. Each container bind-mounts ONE host
-# directory to /homecore; the entrypoint detects the owner and drops
-# privileges to that user before writing anything. So `mkdir homecore-data`
-# as your user is enough — no env vars or pre-chown ritual needed.
+# ── Which compose file? ──────────────────────────────────────────────────────
 #
-# Web UI:    http://localhost:8080
-# Broker:    127.0.0.1:1883 (host network — plugins reach it directly)
+#   compose.yml        this file. Bridge networking. Start here.
+#   compose.host.yml   host networking. Needed for mDNS/SSDP DISCOVERY —
+#                      Hue, Sonos, WLED and Roku find devices by multicast,
+#                      which a bridge network does not carry. If auto-discovery
+#                      turns up nothing, that is the file you want.
+#   compose-dev.yml    the `:dev` tag, rebuilt on every push to develop.
 #
-# All services use `network_mode: host` — required for mDNS/SSDP discovery
-# and for IoT devices on the LAN to reach the embedded broker.
+# Plugins that reach out over ordinary TCP/HTTP (YoLink, Lutron, Caseta, ISY,
+# Z-Wave) work fine on this bridge setup.
 #
-# This file tracks the `:latest` tag (most recent stable release). For the
-# bleeding-edge develop-branch builds, use compose-dev.yml instead.
+# One host bind-mount per service. The entrypoint reads the mount's owner and
+# drops privileges to match, so `mkdir homecore-data` as yourself is the whole
+# setup — no UID env vars, no pre-chown.
 # =============================================================================
 
 services:
@@ -34,11 +48,35 @@ services:
     container_name: homecore
     restart: unless-stopped
     pull_policy: always
-    network_mode: host
     environment:
       RUST_LOG: info
+    ports:
+      # The API. Published so you can curl it directly; hc-web reaches it over
+      # the compose network by service name either way.
+      - "8080:8080"
+      # The embedded MQTT broker is deliberately NOT published. It binds
+      # loopback inside the container and core's plugins are children in the
+      # same network namespace, so nothing outside needs it. Publish 1883 only
+      # if LAN devices (Tasmota/Shelly/ESPHome) publish to it directly — and
+      # then set [broker] host = "0.0.0.0" plus [[broker.clients]] credentials,
+      # or core refuses to start rather than run an open broker.
     volumes:
-      # Single bind-mount: everything mutable lives under /homecore.
-      # First boot seeds config/, data/, rules/ here. INITIAL_ADMIN_PASSWORD
-      # lands at the root.
       - ./homecore-data:/homecore
+      # Seeds first boot: turns core's own web UI off (hc-web serves it) and
+      # points the plugin registry at homecore.io. Remove this line to let the
+      # image's built-in default config seed instead.
+      - ./homecore.toml:/homecore/config/homecore.toml:ro
+
+  hc-web:
+    image: ghcr.io/homecore-io/hc-web:latest
+    container_name: hc-web
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      - homecore
+    environment:
+      # Where nginx sends /api/v1/*. `homecore` is the service name above, so
+      # this resolves on the compose network.
+      HOMECORE_URL: http://homecore:8080
+    ports:
+      - "3000:80"

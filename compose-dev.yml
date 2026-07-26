@@ -1,24 +1,21 @@
 # =============================================================================
-# homeCore — multi-container compose (DEVELOP-BRANCH BUILDS)
+# homeCore — the stack, develop-branch builds (`:dev`).
 #
-# Same shape as compose.yml but pinned to the `:dev` tag — built on every
-# push to `develop`. Use this for live-testing pre-release builds against
-# real hardware before they land in a tagged release.
+# Same shape as compose.yml, pinned to the `:dev` tag that every push to
+# develop retags. Use it to run pre-release builds against real hardware.
 #
-# Container names and data directories carry a `-dev` suffix so a dev stack
-# can coexist with a stable stack (one host per stack — `network_mode: host`
-# means port 8080 / 1883 are claimed by whichever stack is up).
-#
-# Plugins install at runtime from the registry via the UI — not as separate
-# containers.
+# Names and data directories carry a `-dev` suffix so a dev stack can sit
+# alongside a stable one — but you must also change the published ports below,
+# since two stacks cannot both claim 3000 and 8080.
 #
 # Quick start:
-#   1. mkdir homecore-data-dev
-#   2. docker compose -f compose-dev.yml up -d
-#   3. cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
-#   4. http://<host-ip>:8080  →  Plugins → Add
+#   mkdir homecore-data-dev
+#   docker compose -f compose-dev.yml up -d
+#   cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
+#   open http://<host-ip>:3000
 #
-# For the stable `:latest` track, see compose.yml instead.
+# For discovery (Hue/Sonos/WLED/Roku) see compose.host.yml — swap its images
+# to `:dev` for the same effect on this track.
 # =============================================================================
 
 services:
@@ -26,11 +23,25 @@ services:
     image: ghcr.io/homecore-io/hc-core:dev
     container_name: homecore-dev
     restart: unless-stopped
-    # `:dev` is mutable — every develop-branch push retags it. Always
-    # pull on `up` so you actually get the latest commit's build.
+    # `:dev` is mutable — every develop push retags it. Always pull on `up`
+    # or you keep running whatever was cached locally.
     pull_policy: always
-    network_mode: host
     environment:
       RUST_LOG: debug
+    ports:
+      - "8080:8080"
     volumes:
       - ./homecore-data-dev:/homecore
+      - ./homecore.toml:/homecore/config/homecore.toml:ro
+
+  hc-web-dev:
+    image: ghcr.io/homecore-io/hc-web:dev
+    container_name: hc-web-dev
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      - homecore-dev
+    environment:
+      HOMECORE_URL: http://homecore-dev:8080
+    ports:
+      - "3000:80"

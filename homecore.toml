@@ -1,11 +1,16 @@
-# homeCore — new-UI test stack config
+# homeCore — seeded config for the compose stack.
 #
-# Mounted into the hc-core container at /homecore/config/homecore.toml. A
-# complete core config plus a [registry] block, so plugins install from the
-# plugin registry through the (Flutter) web UI — Plugins → Add.
+# Mounted read-only into the hc-core container at
+# /homecore/config/homecore.toml by every compose file here. A complete core
+# config plus a [registry] block, so plugins install at runtime from the signed
+# plugin registry through the web UI — Plugins → Add.
 #
-# web_admin is OFF: the hc-web container serves the UI in front of core and
-# reverse-proxies /api to it, so core itself only needs to serve the API.
+# [web_admin] is OFF on purpose: hc-web serves the UI in front of core and
+# reverse-proxies /api/v1 to it, so core only needs to serve the API. Core no
+# longer ships a UI bundle to serve either.
+#
+# Edit freely — it is your config. To start from the image's built-in default
+# instead, drop the ./homecore.toml bind-mount from the compose file.
 
 [server]
 host = "0.0.0.0"
@@ -67,5 +72,8 @@ format           = "json"
 # static host to self-host.
 # ---------------------------------------------------------------------------
 [registry]
+# Both of these serve the same signed index; homecore.io is the friendly
+# alias for the GitHub Pages original at
+# https://homeCore-io.github.io/registry/index.json
 url        = "https://homecore.io/registry/index.json"
 public_key = "d64zXOo99GE+uYAPbtbIwLUJHtBaACJB73cUppj93I8="
