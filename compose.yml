@@ -82,7 +82,7 @@ services:
       HOMECORE_URL: http://homecore:8080
     networks: [homecore]
     ports:
-      - "${HC_WEB_PORT:-3000}:3001"
+      - "${HC_WEB_PORT:-3000}:80"
 
 # Declared explicitly rather than left to the deployer's default.
 #

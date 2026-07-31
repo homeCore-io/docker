@@ -50,7 +50,7 @@ services:
       HOMECORE_URL: http://homecore-dev:8080
     networks: [homecore-dev]
     ports:
-      - "${HC_WEB_PORT:-3000}:3001"
+      - "${HC_WEB_PORT:-3000}:80"
 
 # Named for the same reason as compose.yml: a stack deployer may not create a
 # per-project network, and the default bridge has no name resolution, so
