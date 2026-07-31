@@ -194,10 +194,15 @@ file](#which-compose-file). Switch to `compose.host.yml`.
 | `:dev` | Rebuilt on every push to develop. Mutable. |
 | `:dev-<sha7>` | A specific develop build, immutable. |
 
-The three components version independently — at the time of writing, core
-`0.1.9`, hc-web `0.1.12`, and this repo `v0.1.10`. To pin a whole stack, check
-this repo out at a tag and set the image versions in the compose file explicitly
-rather than expecting the numbers to agree.
+**The three components version independently and their numbers do not agree.**
+core, hc-web and this repo are each tagged on their own cadence, so `hc-core`
+and `hc-web` are routinely several releases apart. Do not read a shared version
+into them. `git tag` here lists this repo's; the image tags above are core's and
+hc-web's own.
+
+To pin a whole stack, check this repo out at a tag and set both image versions
+in the compose file explicitly, rather than relying on `:latest` or on the
+numbers lining up.
 
 ## Releasing
 
