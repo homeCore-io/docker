@@ -30,6 +30,7 @@ services:
       RUST_LOG: debug
     ports:
       - "8080:8080"
+    networks: [homecore-dev]
     volumes:
       - ./homecore-data-dev:/homecore
       - ./homecore.toml:/homecore/config/homecore.toml:ro
@@ -43,5 +44,13 @@ services:
       - homecore-dev
     environment:
       HOMECORE_URL: http://homecore-dev:8080
+    networks: [homecore-dev]
     ports:
       - "3000:3001"
+
+# Named for the same reason as compose.yml: a stack deployer may not create a
+# per-project network, and the default bridge has no name resolution, so
+# hc-web's nginx cannot resolve `homecore-dev` and crash-loops.
+networks:
+  homecore-dev:
+    driver: bridge
