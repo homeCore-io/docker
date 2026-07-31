@@ -62,23 +62,36 @@ multicast traffic and the file will not do what it exists for.
 
 ## Configuration
 
-`homecore.toml` in this repo is bind-mounted read-only to
-`/homecore/config/homecore.toml`. It is a complete core config with two things
-set for this deployment shape:
+There is nothing to mount. The image seeds `config/homecore.toml` inside
+`homecore-data` on first boot, and the default is correct as shipped: core
+serves no UI (hc-web does), declares no plugins, and points at the signed
+registry. Edit that file and `docker compose restart homecore`; it is yours
+after first boot and is never overwritten.
 
-- `[web_admin] enabled = false` — hc-web serves the UI, so core only serves the
-  API.
-- `[registry]` — the signed plugin registry and its public key.
+This repo used to bind-mount its own `homecore.toml` over that path, because
+the image's default was stale — it enabled a UI core no longer bundles and
+declared four plugins whose binaries are not in the container. Mounting a file
+that only exists if you cloned the repo broke every deployment that pasted the
+compose file into a stack manager instead: Docker created a *directory* at that
+path, and core failed with `cp: can't create
+'/homecore/config/homecore.toml/config.toml': Read-only file system`. The
+default was fixed in core 0.1.8 and the mount is gone.
 
-Edit it and `docker compose restart homecore`. To use the image's built-in
-default instead, drop the `./homecore.toml` bind-mount from the compose file.
+### Ports
+
+`HC_WEB_PORT` (default 3000) and `HC_API_PORT` (default 8080), so a host that
+already has something on either can move them without editing the file:
+
+```sh
+HC_WEB_PORT=8800 HC_API_PORT=8801 docker compose up -d
+```
 
 Everything else lives under the single bind-mount:
 
 ```
 ./homecore-data/
 ├── INITIAL_ADMIN_PASSWORD     printed on first boot; delete it after logging in
-├── config/homecore.toml       (bind-mounted from ./homecore.toml)
+├── config/homecore.toml       seeded by the image on first boot; edit freely
 ├── config/plugins/            per-plugin configs, seeded on install
 ├── data/state.redb            device registry
 ├── data/history.db            time-series history

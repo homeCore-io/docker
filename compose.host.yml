@@ -45,7 +45,11 @@ services:
       RUST_LOG: info
     volumes:
       - ./homecore-data:/homecore
-      - ./homecore.toml:/homecore/config/homecore.toml:ro
+      # No config bind-mount. The image seeds its own default at
+      # config/homecore.toml on first boot and it is correct as shipped —
+      # core serves no UI, declares no plugins, and points at the signed
+      # registry. Edit that file in homecore-data to customise; it is yours
+      # after first boot and never overwritten.
 
   hc-web:
     image: ghcr.io/homecore-io/hc-web:latest
@@ -60,4 +64,4 @@ services:
       HOMECORE_URL: http://127.0.0.1:8080
       # nginx listens here directly. With no port mapping to remap, the
       # container cannot sit on 80 without owning the host's port 80.
-      WEB_PORT: 3000
+      WEB_PORT: ${HC_WEB_PORT:-3000}

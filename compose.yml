@@ -53,7 +53,7 @@ services:
     ports:
       # The API. Published so you can curl it directly; hc-web reaches it over
       # the compose network by service name either way.
-      - "8080:8080"
+      - "${HC_API_PORT:-8080}:8080"
       # The embedded MQTT broker is deliberately NOT published. It binds
       # loopback inside the container and core's plugins are children in the
       # same network namespace, so nothing outside needs it. Publish 1883 only
@@ -63,10 +63,11 @@ services:
     networks: [homecore]
     volumes:
       - ./homecore-data:/homecore
-      # Seeds first boot: turns core's own web UI off (hc-web serves it) and
-      # points the plugin registry at homecore.io. Remove this line to let the
-      # image's built-in default config seed instead.
-      - ./homecore.toml:/homecore/config/homecore.toml:ro
+      # No config bind-mount. The image seeds its own default at
+      # config/homecore.toml on first boot and it is correct as shipped —
+      # core serves no UI, declares no plugins, and points at the signed
+      # registry. Edit that file in homecore-data to customise; it is yours
+      # after first boot and never overwritten.
 
   hc-web:
     image: ghcr.io/homecore-io/hc-web:latest
@@ -81,7 +82,7 @@ services:
       HOMECORE_URL: http://homecore:8080
     networks: [homecore]
     ports:
-      - "3000:3001"
+      - "${HC_WEB_PORT:-3000}:3001"
 
 # Declared explicitly rather than left to the deployer's default.
 #

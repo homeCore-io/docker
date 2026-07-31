@@ -29,11 +29,15 @@ services:
     environment:
       RUST_LOG: debug
     ports:
-      - "8080:8080"
+      - "${HC_API_PORT:-8080}:8080"
     networks: [homecore-dev]
     volumes:
       - ./homecore-data-dev:/homecore
-      - ./homecore.toml:/homecore/config/homecore.toml:ro
+      # No config bind-mount. The image seeds its own default at
+      # config/homecore.toml on first boot and it is correct as shipped —
+      # core serves no UI, declares no plugins, and points at the signed
+      # registry. Edit that file in homecore-data to customise; it is yours
+      # after first boot and never overwritten.
 
   hc-web-dev:
     image: ghcr.io/homecore-io/hc-web:dev
@@ -46,7 +50,7 @@ services:
       HOMECORE_URL: http://homecore-dev:8080
     networks: [homecore-dev]
     ports:
-      - "3000:3001"
+      - "${HC_WEB_PORT:-3000}:3001"
 
 # Named for the same reason as compose.yml: a stack deployer may not create a
 # per-project network, and the default bridge has no name resolution, so
