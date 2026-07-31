@@ -16,12 +16,28 @@
 #
 # What host mode changes:
 #   - No `ports:` mappings. Every listener lands straight on the host, so
-#     hc-web takes WEB_PORT=3000 rather than being mapped there.
-#   - hc-web reaches core at 127.0.0.1 — there is no compose DNS on host
-#     networking, so the `homecore` service name does not resolve.
+#     hc-web takes WEB_PORT=3000 rather than being mapped there. HC_WEB_PORT
+#     therefore changes what nginx *binds*, not what a mapping publishes.
+#   - hc-web reaches core at 127.0.0.1 rather than by service name.
 #   - The containers share the host's network namespace. Port conflicts are
-#     real: if something else on this host owns 3000 or 8080, change WEB_PORT
-#     or [server] port rather than expecting Docker to remap it.
+#     real: if something else on this host owns 3000 or 8080, change the port
+#     rather than expecting Docker to remap it.
+#
+# Why 127.0.0.1 and not `homecore`, which is what compose.yml uses:
+#
+# Docker's embedded DNS belongs to a user-defined network. `network_mode: host`
+# puts the container in the host's network namespace instead, where there is no
+# compose network and so no service-name resolution — but also no need for it,
+# because core is literally on this host. So this is not the bridge file's DNS
+# fix left unapplied; it is the same problem with a simpler answer.
+#
+# nginx still resolves its upstream at request time here (a variable in
+# proxy_pass, per hc-web's Dockerfile), which is what keeps an unstarted core a
+# 502 instead of a boot loop. A literal IP needs no lookup, and the image's
+# resolver comes from /etc/resolv.conf, which in host mode is the host's own.
+#
+# Verified against the published :latest image on 2026-07-31: nginx starts,
+# serves the app, and /api/v1/health returns core's JSON through the proxy.
 #
 # Quick start:
 #   mkdir homecore-data
@@ -60,8 +76,17 @@ services:
     depends_on:
       - homecore
     environment:
-      # No compose DNS on the host network — core is simply on this host.
-      HOMECORE_URL: http://127.0.0.1:8080
+      # Core is simply on this host — see the header for why this is an address
+      # and not the `homecore` service name.
+      #
+      # HC_API_PORT means something different here than in compose.yml. There it
+      # is the published side of a mapping and core stays on 8080 inside its
+      # container. In host mode there is no mapping: core binds whatever its
+      # [server] port says, so this only tells nginx where to look and must be
+      # set to match. It was hardcoded to 8080 while the header told you to
+      # change [server] port on a conflict — follow that and nginx kept
+      # proxying to a port core had left.
+      HOMECORE_URL: http://127.0.0.1:${HC_API_PORT:-8080}
       # nginx listens here directly. With no port mapping to remap, the
       # container cannot sit on 80 without owning the host's port 80.
       WEB_PORT: ${HC_WEB_PORT:-3000}
