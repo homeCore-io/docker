@@ -60,6 +60,7 @@ services:
       # if LAN devices (Tasmota/Shelly/ESPHome) publish to it directly — and
       # then set [broker] host = "0.0.0.0" plus [[broker.clients]] credentials,
       # or core refuses to start rather than run an open broker.
+    networks: [homecore]
     volumes:
       - ./homecore-data:/homecore
       # Seeds first boot: turns core's own web UI off (hc-web serves it) and
@@ -78,5 +79,23 @@ services:
       # Where nginx sends /api/v1/*. `homecore` is the service name above, so
       # this resolves on the compose network.
       HOMECORE_URL: http://homecore:8080
+    networks: [homecore]
     ports:
       - "3000:3001"
+
+# Declared explicitly rather than left to the deployer's default.
+#
+# `docker compose up` creates a per-project network on its own and Docker's
+# embedded DNS resolves service names on it, so this file worked without a
+# networks block for anyone running compose directly. Deployed as a *stack*
+# through a manager (Dockhand, Portainer, and anything else that hands the file
+# to the engine differently) the containers can land on the default `bridge`
+# network instead — and the default bridge has no name resolution at all.
+#
+# The failure is nasty because core is fine: it starts, it serves, and hc-web's
+# nginx dies at config load with `host not found in upstream "homecore"`,
+# restarts, and loops. Naming the network makes the stack behave the same
+# wherever it is deployed from.
+networks:
+  homecore:
+    driver: bridge
