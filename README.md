@@ -22,6 +22,10 @@ registry](https://github.com/homeCore-io/registry), verifies its ed25519
 signature, and runs it as a child process. Adding hardware support never means
 editing a compose file.
 
+**The proxy is not a convenience.** The app calls `/api/v1` as a *relative*
+path and core sends no CORS headers, so the API has to be same-origin with the
+app. There is no supported shape where a browser talks to core directly.
+
 ---
 
 ## Quick start
@@ -38,6 +42,17 @@ cat homecore-data/INITIAL_ADMIN_PASSWORD
 
 Open `http://<host-ip>:3000`, log in with `admin` and that password, then go to
 Plugins → Add and install what your hardware needs.
+
+### Deploying through a stack manager
+
+Dockhand, Portainer and anything else that hands the file to the engine rather
+than running `docker compose` will also work — but paste the file *whole*. The
+`networks:` block at the bottom of `compose.yml` is load-bearing when deployed
+this way, and dropping it produces the boot loop described under
+[Troubleshooting](#troubleshooting).
+
+There is no repo to clone in that shape, which is deliberate: nothing in these
+files bind-mounts anything that only exists in a checkout.
 
 ## Which compose file
 
@@ -68,25 +83,29 @@ serves no UI (hc-web does), declares no plugins, and points at the signed
 registry. Edit that file and `docker compose restart homecore`; it is yours
 after first boot and is never overwritten.
 
-This repo used to bind-mount its own `homecore.toml` over that path, because
-the image's default was stale — it enabled a UI core no longer bundles and
-declared four plugins whose binaries are not in the container. Mounting a file
-that only exists if you cloned the repo broke every deployment that pasted the
-compose file into a stack manager instead: Docker created a *directory* at that
-path, and core failed with `cp: can't create
-'/homecore/config/homecore.toml/config.toml': Read-only file system`. The
-default was fixed in core 0.1.8 and the mount is gone.
-
 ### Ports
 
-`HC_WEB_PORT` (default 3000) and `HC_API_PORT` (default 8080), so a host that
-already has something on either can move them without editing the file:
+`HC_WEB_PORT` (default 3000) and `HC_API_PORT` (default 8080) move the stack off
+a busy host without editing a file:
 
 ```sh
 HC_WEB_PORT=8800 HC_API_PORT=8801 docker compose up -d
 ```
 
-Everything else lives under the single bind-mount:
+**They mean different things in the two networking modes**, which is worth
+knowing before you change one:
+
+| | `compose.yml` / `compose-dev.yml` (bridge) | `compose.host.yml` (host) |
+|---|---|---|
+| `HC_WEB_PORT` | Published side of `HC_WEB_PORT:80`. nginx stays on 80 inside. | The port nginx itself binds, straight on the host. |
+| `HC_API_PORT` | Published side of `HC_API_PORT:8080`. Core stays on 8080 inside. | Tells nginx where core is. Core binds whatever `[server] port` says — set this to match. |
+
+Host mode has no port mappings at all, so nothing gets remapped for you: if
+something else owns a port, move it here *and* in core's config.
+
+### Layout
+
+Everything lives under the single bind-mount:
 
 ```
 ./homecore-data/
@@ -122,17 +141,63 @@ to a non-loopback address with no clients configured, rather than quietly
 running an open broker; `HC_ALLOW_ANONYMOUS_REMOTE_BROKER=1` overrides that if
 you genuinely mean it.
 
+## Troubleshooting
+
+Both of these were real, and both point away from themselves — which is the only
+reason they are worth a section.
+
+### hc-web restarts forever with `host not found in upstream "homecore"`
+
+Core is healthy; it starts, serves and logs nothing wrong. The half of the stack
+that is *not* broken is the half that dies.
+
+The containers landed on Docker's default `bridge` network, which has no name
+resolution at all, so nginx could not resolve `homecore`. `docker compose up`
+creates a per-project network with embedded DNS and never shows this; a stack
+manager that hands the file to the engine can skip that step.
+
+**Fix:** use the `networks:` block at the bottom of `compose.yml`. If you pasted
+an excerpt into a stack manager, paste the whole file.
+
+Since hc-web 0.1.8 nginx also resolves its upstream per request rather than at
+config load, so an unreachable core is a `502` that recovers on its own instead
+of a container that exits. The named network is still what makes the name
+resolve in the first place.
+
+### `cp: can't create '/homecore/config/homecore.toml/config.toml': Read-only file system`
+
+A `homecore.toml` bind-mount that pointed at a file which only existed in a
+clone. Deploy the same file without the repo and Docker helpfully created a
+*directory* at that path, so core's seed copy had nowhere to land.
+
+**Fix:** already gone — there is no config mount. Core 0.1.8 corrected the
+image's own default, which is what the mount had been compensating for. If you
+are carrying a local copy of an older compose file, delete the mount.
+
+### The UI is unreachable but both containers are up
+
+Check what is actually published: `docker compose ps`. Through v0.1.9 the web
+mapping pointed at container port 3001 and nginx listens on 80, so the published
+port refused connections. Fixed in docker v0.1.10.
+
+### Discovery finds nothing
+
+Expected on `compose.yml` for Hue, Sonos, WLED and Roku — see [Which compose
+file](#which-compose-file). Switch to `compose.host.yml`.
+
 ## Image tags
 
 | Tag | Meaning |
 |---|---|
 | `:latest` | Most recent tagged release. What `compose.yml` tracks. |
-| `:0.1.6` | A specific release, immutable. |
+| `:0.1.9` | A specific release, immutable. |
 | `:dev` | Rebuilt on every push to develop. Mutable. |
 | `:dev-<sha7>` | A specific develop build, immutable. |
 
-To pin the whole stack, `git checkout v0.1.6` here and use the compose file at
-that tag with the matching image versions.
+The three components version independently — at the time of writing, core
+`0.1.9`, hc-web `0.1.12`, and this repo `v0.1.10`. To pin a whole stack, check
+this repo out at a tag and set the image versions in the compose file explicitly
+rather than expecting the numbers to agree.
 
 ## Releasing
 
@@ -144,14 +209,14 @@ tag is missing, core's release fails with a message saying so rather than
 silently building against `develop`.
 
 hc-web builds its own image from `clients/hc-web/Dockerfile`; nothing here is
-involved.
+involved, and it is not part of that lockstep.
 
 ## What used to be here
 
 An **appliance image** (`homecore-appliance`) baked core and every plugin into
-one container, and this repo had a workflow to build it. It is retired — the
-stack above replaces it. Existing appliance images remain in GHCR, so anything
-still running one keeps working, but no new ones are published.
+one container. It is retired — the stack above replaces it. Existing images
+remain in GHCR, so anything still running one keeps working, but no new ones are
+published.
 
 There were also `Dockerfile.plugin` and a multi-host example running each plugin
 as its own container. Plugins ship as signed registry artifacts now, so neither
