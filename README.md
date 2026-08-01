@@ -206,15 +206,21 @@ numbers lining up.
 
 ## Releasing
 
-`images/Dockerfile.core` is the recipe for the published `hc-core` image, but
-this repo does not build it — homeCore's own `release.yml` does, checking this
-repo out at the ref its `docker_repo_ref` names. That makes this repo part of
-core's build recipe, which is why **this repo is tagged before core**. If the
-tag is missing, core's release fails with a message saying so rather than
-silently building against `develop`.
+Nothing here is part of anyone's build recipe any more, so **this repo does not
+need tagging before core** — or at all, for a core release.
 
-hc-web builds its own image from `clients/hc-web/Dockerfile`; nothing here is
-involved, and it is not part of that lockstep.
+`images/Dockerfile.core` used to be that recipe: homeCore's `release.yml` checked
+this repo out at the ref `docker_repo_ref` named and built the published
+`hc-core` image from it, which is why this repo had to be tagged first. Since
+this repo carries no version of its own, those tags were empty re-cuts existing
+only to satisfy that pin. The recipe moved to `docker/Dockerfile.core` in
+homeCore-io/homeCore on 2026-08-01, so it is versioned with the binary it wraps
+and core's tag alone reproduces its image. Core releases up to v0.1.13 were
+built the old way and still resolve the tags they used, so nothing historical
+breaks.
+
+hc-web builds its own image from `clients/hc-web/Dockerfile` and always did;
+nothing here was ever involved. Core works the same way now.
 
 ## What used to be here
 
@@ -226,3 +232,8 @@ published.
 There were also `Dockerfile.plugin` and a multi-host example running each plugin
 as its own container. Plugins ship as signed registry artifacts now, so neither
 had a consumer.
+
+`images/` held `Dockerfile.core` and `entrypoint-core.sh`, the recipe for the
+published core image, until 2026-08-01. They live in homeCore-io/homeCore under
+`docker/` now — with the binary they wrap, rather than in a repo that had to be
+tagged in lockstep to record which recipe built what.
