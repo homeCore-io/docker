@@ -59,7 +59,7 @@ files bind-mounts anything that only exists in a checkout.
 | File | Networking | Use it when |
 |---|---|---|
 | `compose.yml` | bridge | **Start here.** |
-| `compose.host.yml` | host | You have Hue, Sonos, WLED or Roku — or discovery found nothing. |
+| `compose.host.yml` | host | You have Hue, Sonos, WLED, Roku or Ecowitt — or discovery found nothing. |
 | `compose-dev.yml` | bridge | You want the `:dev` tag, rebuilt on every push to develop. |
 
 The distinction that matters is **discovery**. Hue, Sonos, WLED and Roku find
@@ -69,7 +69,26 @@ find nothing at all. Sonos also serves UPnP event callbacks and has to advertise
 an address the speakers can reach back on, which a NATed container IP is not.
 
 Plugins that reach out over ordinary TCP or HTTP — YoLink, Lutron, Caseta, ISY,
-Z-Wave, Ecowitt — are fine on the bridge setup.
+Z-Wave — are fine on the bridge setup, because outbound connections NAT out of
+a container without help.
+
+**Ecowitt is not one of them**, and used to be listed here as if it were. Two of
+its three paths need more than outbound TCP:
+
+- *Gateway discovery* is a UDP broadcast to `255.255.255.255:45000`. A bridge
+  network does not forward broadcast any more than it forwards multicast, so
+  `discover_gateways` returns nothing however many gateways are on the LAN.
+- *Receiving* uploads means the gateway opens a connection **to** homeCore, on
+  `[ecowitt].listen_port` (default `8888`). This file does not publish that
+  port, so nothing outside the container can reach it — setting
+  `bind_addr = "0.0.0.0"` alone is not enough here, which it would be on bare
+  metal.
+- *Polling* is the exception and works on the bridge unchanged: set
+  `[ecowitt].gateway_ip` and the plugin fetches from the gateway over ordinary
+  outbound HTTP.
+
+So on `compose.yml`: set `gateway_ip`, or publish `8888` and set `bind_addr`.
+On `compose.host.yml` all three work as documented.
 
 `compose.host.yml` is Linux only. Docker Desktop on macOS and Windows runs
 containers inside a VM, so host networking there does not reach the LAN's
@@ -182,8 +201,12 @@ port refused connections. Fixed in docker v0.1.10.
 
 ### Discovery finds nothing
 
-Expected on `compose.yml` for Hue, Sonos, WLED and Roku — see [Which compose
-file](#which-compose-file). Switch to `compose.host.yml`.
+Expected on `compose.yml` for Hue, Sonos, WLED, Roku and Ecowitt — see [Which
+compose file](#which-compose-file). Switch to `compose.host.yml`.
+
+Ecowitt has a second option that needs no network change: set
+`[ecowitt].gateway_ip` to the gateway's address and it polls over outbound HTTP
+instead of discovering and receiving.
 
 ## Image tags
 
