@@ -6,11 +6,13 @@
 #
 # Hue, Sonos, WLED and Roku find devices with mDNS and SSDP — multicast, which
 # a Docker bridge network does not forward. On compose.yml those plugins install
-# and run, then find nothing. Sonos additionally serves UPnP event callbacks on
+# and run, then find nothing. Ecowitt is the same story with UDP broadcast for
+# discovery, plus a receiver on :8888 that compose.yml does not publish — set
+# [ecowitt].gateway_ip to poll instead if you would rather stay on the bridge. Sonos additionally serves UPnP event callbacks on
 # :5005 and has to advertise an address the speakers can actually reach back on,
 # which a NATed container IP is not.
 #
-# So: use this file if you have Hue, Sonos, WLED or Roku, or if auto-discovery
+# So: use this file if you have Hue, Sonos, WLED, Roku or Ecowitt, or if auto-discovery
 # turned up empty on the bridge setup. Use compose.yml otherwise — it is the
 # simpler thing and it isolates the containers properly.
 #
