@@ -28,14 +28,17 @@
 # ── Which compose file? ──────────────────────────────────────────────────────
 #
 #   compose.yml        this file. Bridge networking. Start here.
-#   compose.host.yml   host networking. Needed for mDNS/SSDP DISCOVERY —
-#                      Hue, Sonos, WLED and Roku find devices by multicast,
-#                      which a bridge network does not carry. If auto-discovery
-#                      turns up nothing, that is the file you want.
+#   compose.host.yml   host networking. Needed for DISCOVERY — Hue, Sonos, WLED
+#                      and Roku find devices by multicast (mDNS/SSDP) and
+#                      Ecowitt by UDP broadcast, neither of which a bridge
+#                      network carries. If auto-discovery turns up nothing,
+#                      that is the file you want.
 #   compose-dev.yml    the `:dev` tag, rebuilt on every push to develop.
 #
 # Plugins that reach out over ordinary TCP/HTTP (YoLink, Lutron, Caseta, ISY,
-# Z-Wave) work fine on this bridge setup.
+# Z-Wave) work fine on this bridge setup. Ecowitt can join them without
+# switching files: set [ecowitt].gateway_ip and it polls the gateway over
+# outbound HTTP instead of discovering it and being uploaded to.
 #
 # One host bind-mount per service. The entrypoint reads the mount's owner and
 # drops privileges to match, so `mkdir homecore-data` as yourself is the whole
