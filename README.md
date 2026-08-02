@@ -213,7 +213,7 @@ instead of discovering and receiving.
 | Tag | Meaning |
 |---|---|
 | `:latest` | Most recent tagged release. What `compose.yml` tracks. |
-| `:0.1.9` | A specific release, immutable. |
+| `:0.1.18` | A specific release, immutable. |
 | `:dev` | Rebuilt on every push to develop. Mutable. |
 | `:dev-<sha7>` | A specific develop build, immutable. |
 
