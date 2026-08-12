@@ -60,7 +60,7 @@ files bind-mounts anything that only exists in a checkout.
 |---|---|---|
 | `compose.yml` | bridge | **Start here.** |
 | `compose.host.yml` | host | You have Hue, Sonos, WLED, Roku or Ecowitt — or discovery found nothing. |
-| `compose-dev.yml` | bridge | You want the `:dev` tag, rebuilt on every push to develop. |
+| `compose-dev.yml` | bridge | You want the `:dev` tag, built from develop on request. |
 
 The distinction that matters is **discovery**. Hue, Sonos, WLED and Roku find
 devices over mDNS/SSDP, which is multicast — and a Docker bridge network does
@@ -214,8 +214,8 @@ instead of discovering and receiving.
 |---|---|
 | `:latest` | Most recent tagged release. What `compose.yml` tracks. |
 | `:0.1.18` | A specific release, immutable. |
-| `:dev` | Rebuilt on every push to develop. Mutable. |
-| `:dev-<sha7>` | A specific develop build, immutable. |
+| `:dev` | The develop branch, built **on request** — run `release.yml` from the Actions tab or `gh workflow run release.yml --ref develop`. Mutable, and only as fresh as the last such run. |
+| `:dev-<sha7>` | A specific develop build, immutable. Published by the same manual run. |
 
 **The three components version independently and their numbers do not agree.**
 core, hc-web and this repo are each tagged on their own cadence, so `hc-core`
