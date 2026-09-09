@@ -1,8 +1,14 @@
 # =============================================================================
 # homeCore — the stack, develop-branch builds (`:dev`).
 #
-# Same shape as compose.yml, pinned to the `:dev` tag that every push to
-# develop retags. Use it to run pre-release builds against real hardware.
+# Same shape as compose.yml, pinned to the `:dev` tag. Use it to run
+# pre-release builds against real hardware.
+#
+# **That tag is built on request, not on every push** — as of 2026-08-12 both
+# core and hc-web publish it from a manual run (`gh workflow run release.yml
+# --ref develop`, or the Actions tab) rather than from every commit to develop.
+# So `:dev` is as fresh as the last time someone asked for it: build it before
+# you pull if you are chasing something specific.
 #
 # Names and data directories carry a `-dev` suffix so a dev stack can sit
 # alongside a stable one — but you must also change the published ports below,
@@ -23,8 +29,8 @@ services:
     image: ghcr.io/homecore-io/hc-core:dev
     container_name: homecore-dev
     restart: unless-stopped
-    # `:dev` is mutable — every develop push retags it. Always pull on `up`
-    # or you keep running whatever was cached locally.
+    # `:dev` is mutable — each build of it retags. Always pull on `up` or you
+    # keep running whatever was cached locally.
     pull_policy: always
     environment:
       RUST_LOG: debug

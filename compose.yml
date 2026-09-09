@@ -33,7 +33,7 @@
 #                      Ecowitt by UDP broadcast, neither of which a bridge
 #                      network carries. If auto-discovery turns up nothing,
 #                      that is the file you want.
-#   compose-dev.yml    the `:dev` tag, rebuilt on every push to develop.
+#   compose-dev.yml    the `:dev` tag, built from develop on request.
 #
 # Plugins that reach out over ordinary TCP/HTTP (YoLink, Lutron, Caseta, ISY,
 # Z-Wave) work fine on this bridge setup. Ecowitt can join them without
