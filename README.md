@@ -3,18 +3,19 @@
 The images and compose files that run homeCore.
 
 ```
-browser ─▶ hc-web ─┬─ /            the Flutter web UI
-                   └─ /api/v1/* ──▶ hc-core ──▶ plugins (child processes)
-                                       │
-                                       └─ embedded MQTT broker
+browser ─▶ app :3000 ────┬─ /            the web app
+                         └─ /api/v1/* ──▶ hc-core ──▶ plugins (child processes)
+browser ─▶ hc-web :3001 ─┬─ /            hand-built pages     │
+                         └─ /api/v1/* ──▶ ┘                    └─ embedded MQTT broker
 ```
 
-Two containers, and that is the whole stack.
+Three containers, and that is the whole stack.
 
 | Image | What it is |
 |---|---|
 | `ghcr.io/homecore-io/hc-core` | The REST/WebSocket API and the embedded MQTT broker. No UI, no plugins. |
-| `ghcr.io/homecore-io/hc-web` | The Flutter web UI. nginx serves the app and reverse-proxies `/api/v1/*` to core. |
+| `ghcr.io/homecore-io/hc-web-svelte` | The web app — for the household and for running the house. Its server passes `/api/v1/*` and the event stream through to core, and keeps the app's own data (pages, layouts, displays) in its `/data` volume. |
+| `ghcr.io/homecore-io/hc-web` | The Flutter web UI, kept for hand-built dashboard pages until the app has its own. nginx serves it and reverse-proxies `/api/v1/*` to core. |
 
 **Plugins are not containers.** Install them from the UI — Plugins → Add — and
 core downloads a signed artifact from the [plugin
@@ -41,7 +42,8 @@ cat homecore-data/INITIAL_ADMIN_PASSWORD
 ```
 
 Open `http://<host-ip>:3000`, log in with `admin` and that password, then go to
-Plugins → Add and install what your hardware needs.
+Settings → Plugins → Add and install what your hardware needs. Hand-built
+dashboard pages are at `http://<host-ip>:3001`.
 
 ### Deploying through a stack manager
 
@@ -104,11 +106,11 @@ after first boot and is never overwritten.
 
 ### Ports
 
-`HC_WEB_PORT` (default 3000) and `HC_API_PORT` (default 8080) move the stack off
-a busy host without editing a file:
+`HC_WEB_PORT` (default 3000), `HC_PAGES_PORT` (default 3001) and `HC_API_PORT`
+(default 8080) move the stack off a busy host without editing a file:
 
 ```sh
-HC_WEB_PORT=8800 HC_API_PORT=8801 docker compose up -d
+HC_WEB_PORT=8800 HC_PAGES_PORT=8802 HC_API_PORT=8801 docker compose up -d
 ```
 
 **They mean different things in the two networking modes**, which is worth
@@ -116,8 +118,9 @@ knowing before you change one:
 
 | | `compose.yml` / `compose-dev.yml` (bridge) | `compose.host.yml` (host) |
 |---|---|---|
-| `HC_WEB_PORT` | Published side of `HC_WEB_PORT:80`. nginx stays on 80 inside. | The port nginx itself binds, straight on the host. |
-| `HC_API_PORT` | Published side of `HC_API_PORT:8080`. Core stays on 8080 inside. | Tells nginx where core is. Core binds whatever `[server] port` says — set this to match. |
+| `HC_WEB_PORT` | Published side of `HC_WEB_PORT:3000`. The app stays on 3000 inside. | The port the app itself binds, straight on the host. |
+| `HC_PAGES_PORT` | Published side of `HC_PAGES_PORT:80`. nginx stays on 80 inside. | The port nginx itself binds, straight on the host. |
+| `HC_API_PORT` | Published side of `HC_API_PORT:8080`. Core stays on 8080 inside. | Tells the app and nginx where core is. Core binds whatever `[server] port` says — set this to match. |
 
 Host mode has no port mappings at all, so nothing gets remapped for you: if
 something else owns a port, move it here *and* in core's config.
@@ -138,6 +141,10 @@ Everything lives under the single bind-mount:
 ├── rules/                     automation rules, hot-reloaded
 └── logs/
 ```
+
+The app keeps its own data — pages, people's Homes and phone bars, displays,
+the house's look — in the `app-data` volume, not the bind-mount: homeCore's
+backup doesn't hold it. Settings → Data & backups in the app saves it to a file.
 
 ### File ownership
 

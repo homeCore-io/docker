@@ -12,7 +12,7 @@
 #
 # Names and data directories carry a `-dev` suffix so a dev stack can sit
 # alongside a stable one — but you must also change the published ports below,
-# since two stacks cannot both claim 3000 and 8080.
+# since two stacks cannot both claim 3000, 3001 and 8080.
 #
 # Quick start:
 #   mkdir homecore-data-dev
@@ -45,6 +45,22 @@ services:
       # registry. Edit that file in homecore-data to customise; it is yours
       # after first boot and never overwritten.
 
+  app-dev:
+    image: ghcr.io/homecore-io/hc-web-svelte:dev
+    container_name: hc-web-svelte-dev
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      - homecore-dev
+    environment:
+      HC_CORE_URL: http://homecore-dev:8080
+    networks: [homecore-dev]
+    ports:
+      - "${HC_WEB_PORT:-3000}:3000"
+    volumes:
+      - app-data-dev:/data
+
+  # Kept for hand-built dashboard pages until the app has its own (round three).
   hc-web-dev:
     image: ghcr.io/homecore-io/hc-web:dev
     container_name: hc-web-dev
@@ -56,7 +72,7 @@ services:
       HOMECORE_URL: http://homecore-dev:8080
     networks: [homecore-dev]
     ports:
-      - "${HC_WEB_PORT:-3000}:80"
+      - "${HC_PAGES_PORT:-3001}:80"
 
 # Named for the same reason as compose.yml: a stack deployer may not create a
 # per-project network, and the default bridge has no name resolution, so
@@ -64,3 +80,6 @@ services:
 networks:
   homecore-dev:
     driver: bridge
+
+volumes:
+  app-data-dev:

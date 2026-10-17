@@ -18,12 +18,13 @@
 #
 # What host mode changes:
 #   - No `ports:` mappings. Every listener lands straight on the host, so
-#     hc-web takes WEB_PORT=3000 rather than being mapped there. HC_WEB_PORT
-#     therefore changes what nginx *binds*, not what a mapping publishes.
-#   - hc-web reaches core at 127.0.0.1 rather than by service name.
+#     the app binds PORT=3000 and hc-web WEB_PORT=3001 rather than being
+#     mapped there. HC_WEB_PORT and HC_PAGES_PORT therefore change what each
+#     *binds*, not what a mapping publishes.
+#   - The app and hc-web reach core at 127.0.0.1 rather than by service name.
 #   - The containers share the host's network namespace. Port conflicts are
-#     real: if something else on this host owns 3000 or 8080, change the port
-#     rather than expecting Docker to remap it.
+#     real: if something else on this host owns 3000, 3001 or 8080, change the
+#     port rather than expecting Docker to remap it.
 #
 # Why 127.0.0.1 and not `homecore`, which is what compose.yml uses:
 #
@@ -69,6 +70,24 @@ services:
       # registry. Edit that file in homecore-data to customise; it is yours
       # after first boot and never overwritten.
 
+  app:
+    image: ghcr.io/homecore-io/hc-web-svelte:latest
+    container_name: hc-web-svelte
+    restart: unless-stopped
+    pull_policy: always
+    network_mode: host
+    depends_on:
+      - homecore
+    environment:
+      # Core is simply on this host; see HOMECORE_URL below for why the port
+      # must match core's [server] port.
+      HC_CORE_URL: http://127.0.0.1:${HC_API_PORT:-8080}
+      # The app's server binds this straight on the host.
+      PORT: ${HC_WEB_PORT:-3000}
+    volumes:
+      - app-data:/data
+
+  # Kept for hand-built dashboard pages until the app has its own (round three).
   hc-web:
     image: ghcr.io/homecore-io/hc-web:latest
     container_name: hc-web
@@ -91,4 +110,7 @@ services:
       HOMECORE_URL: http://127.0.0.1:${HC_API_PORT:-8080}
       # nginx listens here directly. With no port mapping to remap, the
       # container cannot sit on 80 without owning the host's port 80.
-      WEB_PORT: ${HC_WEB_PORT:-3000}
+      WEB_PORT: ${HC_PAGES_PORT:-3001}
+
+volumes:
+  app-data:

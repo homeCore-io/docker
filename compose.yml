@@ -1,22 +1,29 @@
 # =============================================================================
 # homeCore — the stack. Stable (`:latest`) track.
 #
-# Two containers:
+# Three containers:
 #
 #   homecore   hc-core — the REST/WebSocket API and the embedded MQTT broker.
 #              No UI, no baked-in plugins.
 #
-#   hc-web     the Flutter web UI. nginx inside this image serves the app AND
-#              reverse-proxies /api/v1/* — including the WebSocket and SSE
-#              streams — to homecore. That proxy is not a convenience: the app
-#              calls /api/v1 as a RELATIVE path and core sends no CORS headers,
-#              so the API has to be same-origin with the app or nothing works.
+#   app        hc-web-svelte — the web app, for the household and for running
+#              the house: rooms, scenes, rules, plugins, people, backups. Its
+#              Node server serves the app, passes /api/v1/* and the event
+#              stream through to homecore on the same origin (core sends no
+#              CORS headers), keeps sign-ins in httpOnly cookies, and stores
+#              the app's own data — pages, layouts, displays — in /data.
+#
+#   hc-web     the Flutter web UI, kept for one thing: hand-built dashboard
+#              pages, until the new app has its own (round three). Its nginx
+#              reverse-proxies /api/v1/* to homecore the same way.
 #
 # Plugins are NOT containers. Install them from the UI (Plugins → Add) and core
 # pulls a signed artifact from the plugin registry, verifies it, and runs it as
 # a child process. Adding hardware support never means editing this file.
 #
-#   browser ─▶ hc-web:3000 ─┬─ /           the Flutter app
+#   browser ─▶ app:3000    ─┬─ /           the web app
+#                           └─ /api/v1/* ─▶ homecore:8080
+#   browser ─▶ hc-web:3001 ─┬─ /           hand-built pages (Flutter)
 #                           └─ /api/v1/* ─▶ homecore:8080
 #
 # Quick start:
@@ -54,8 +61,8 @@ services:
     environment:
       RUST_LOG: info
     ports:
-      # The API. Published so you can curl it directly; hc-web reaches it over
-      # the compose network by service name either way.
+      # The API. Published so you can curl it directly; the app and hc-web
+      # reach it over the compose network by service name either way.
       - "${HC_API_PORT:-8080}:8080"
       # The embedded MQTT broker is deliberately NOT published. It binds
       # loopback inside the container and core's plugins are children in the
@@ -72,6 +79,25 @@ services:
       # registry. Edit that file in homecore-data to customise; it is yours
       # after first boot and never overwritten.
 
+  app:
+    image: ghcr.io/homecore-io/hc-web-svelte:latest
+    container_name: hc-web-svelte
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      - homecore
+    environment:
+      # Where the app's server finds homeCore. `homecore` is the service name
+      # above, so this resolves on the compose network.
+      HC_CORE_URL: http://homecore:8080
+    networks: [homecore]
+    ports:
+      - "${HC_WEB_PORT:-3000}:3000"
+    volumes:
+      # The app's own data: pages, people's Homes, displays, the house's look.
+      # homeCore's backup doesn't hold it — Settings → Data & backups saves it.
+      - app-data:/data
+
   hc-web:
     image: ghcr.io/homecore-io/hc-web:latest
     container_name: hc-web
@@ -85,7 +111,7 @@ services:
       HOMECORE_URL: http://homecore:8080
     networks: [homecore]
     ports:
-      - "${HC_WEB_PORT:-3000}:80"
+      - "${HC_PAGES_PORT:-3001}:80"
 
 # Declared explicitly rather than left to the deployer's default.
 #
@@ -103,3 +129,6 @@ services:
 networks:
   homecore:
     driver: bridge
+
+volumes:
+  app-data:
