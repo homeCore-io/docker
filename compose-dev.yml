@@ -5,20 +5,20 @@
 # pre-release builds against real hardware.
 #
 # **That tag is built on request, not on every push** — as of 2026-08-12 both
-# core and hc-web publish it from a manual run (`gh workflow run release.yml
+# core and the app publish it from a manual run (`gh workflow run release.yml
 # --ref develop`, or the Actions tab) rather than from every commit to develop.
 # So `:dev` is as fresh as the last time someone asked for it: build it before
 # you pull if you are chasing something specific.
 #
 # Names and data directories carry a `-dev` suffix so a dev stack can sit
 # alongside a stable one — but you must also change the published ports below,
-# since two stacks cannot both claim 3000, 3001 and 8080.
+# since two stacks cannot both claim 3001 and 8080.
 #
 # Quick start:
 #   mkdir homecore-data-dev
 #   docker compose -f compose-dev.yml up -d
 #   cat homecore-data-dev/INITIAL_ADMIN_PASSWORD
-#   open http://<host-ip>:3000
+#   open http://<host-ip>:3001
 #
 # For discovery (Hue/Sonos/WLED/Roku) see compose.host.yml — swap its images
 # to `:dev` for the same effect on this track.
@@ -56,27 +56,14 @@ services:
       HC_CORE_URL: http://homecore-dev:8080
     networks: [homecore-dev]
     ports:
-      - "${HC_WEB_PORT:-3000}:3000"
+      - "${HC_WEB_PORT:-3001}:3000"
     volumes:
       - app-data-dev:/data
 
-  # Kept for hand-built dashboard pages until the app has its own (round three).
-  hc-web-dev:
-    image: ghcr.io/homecore-io/hc-web:dev
-    container_name: hc-web-dev
-    restart: unless-stopped
-    pull_policy: always
-    depends_on:
-      - homecore-dev
-    environment:
-      HOMECORE_URL: http://homecore-dev:8080
-    networks: [homecore-dev]
-    ports:
-      - "${HC_PAGES_PORT:-3001}:80"
 
 # Named for the same reason as compose.yml: a stack deployer may not create a
 # per-project network, and the default bridge has no name resolution, so
-# hc-web's nginx cannot resolve `homecore-dev` and crash-loops.
+# the app cannot resolve `homecore-dev`.
 networks:
   homecore-dev:
     driver: bridge
