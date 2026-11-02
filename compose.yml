@@ -6,24 +6,25 @@
 #   homecore   hc-core — the REST/WebSocket API and the embedded MQTT broker.
 #              No UI, no baked-in plugins.
 #
-#   hc-web     the Flutter web UI. nginx inside this image serves the app AND
-#              reverse-proxies /api/v1/* — including the WebSocket and SSE
-#              streams — to homecore. That proxy is not a convenience: the app
-#              calls /api/v1 as a RELATIVE path and core sends no CORS headers,
-#              so the API has to be same-origin with the app or nothing works.
+#   app        hc-web-svelte — the web app, for the household and for running
+#              the house: rooms, scenes, rules, plugins, people, backups. Its
+#              Node server serves the app, passes /api/v1/* and the event
+#              stream through to homecore on the same origin (core sends no
+#              CORS headers), keeps sign-ins in httpOnly cookies, and stores
+#              the app's own data — pages, layouts, displays — in /data.
 #
 # Plugins are NOT containers. Install them from the UI (Plugins → Add) and core
 # pulls a signed artifact from the plugin registry, verifies it, and runs it as
 # a child process. Adding hardware support never means editing this file.
 #
-#   browser ─▶ hc-web:3000 ─┬─ /           the Flutter app
-#                           └─ /api/v1/* ─▶ homecore:8080
+#   browser ─▶ host:3001 ─▶ app:3000 ─┬─ /           the web app
+#                                     └─ /api/v1/* ─▶ homecore:8080
 #
 # Quick start:
 #   mkdir homecore-data
 #   docker compose up -d
 #   cat homecore-data/INITIAL_ADMIN_PASSWORD     # first-boot admin creds
-#   open http://<host-ip>:3000
+#   open http://<host-ip>:3001
 #
 # ── Which compose file? ──────────────────────────────────────────────────────
 #
@@ -54,8 +55,8 @@ services:
     environment:
       RUST_LOG: info
     ports:
-      # The API. Published so you can curl it directly; hc-web reaches it over
-      # the compose network by service name either way.
+      # The API. Published so you can curl it directly; the app reaches it
+      # over the compose network by service name either way.
       - "${HC_API_PORT:-8080}:8080"
       # The embedded MQTT broker is deliberately NOT published. It binds
       # loopback inside the container and core's plugins are children in the
@@ -72,20 +73,25 @@ services:
       # registry. Edit that file in homecore-data to customise; it is yours
       # after first boot and never overwritten.
 
-  hc-web:
-    image: ghcr.io/homecore-io/hc-web:latest
-    container_name: hc-web
+  app:
+    image: ghcr.io/homecore-io/hc-web-svelte:latest
+    container_name: hc-web-svelte
     restart: unless-stopped
     pull_policy: always
     depends_on:
       - homecore
     environment:
-      # Where nginx sends /api/v1/*. `homecore` is the service name above, so
-      # this resolves on the compose network.
-      HOMECORE_URL: http://homecore:8080
+      # Where the app's server finds homeCore. `homecore` is the service name
+      # above, so this resolves on the compose network.
+      HC_CORE_URL: http://homecore:8080
     networks: [homecore]
     ports:
-      - "${HC_WEB_PORT:-3000}:80"
+      # The app listens on 3000 inside its container; the host gets 3001.
+      - "${HC_WEB_PORT:-3001}:3000"
+    volumes:
+      # The app's own data: pages, people's Homes, displays, the house's look.
+      # homeCore's backup doesn't hold it — Settings → Data & backups saves it.
+      - app-data:/data
 
 # Declared explicitly rather than left to the deployer's default.
 #
@@ -96,10 +102,12 @@ services:
 # to the engine differently) the containers can land on the default `bridge`
 # network instead — and the default bridge has no name resolution at all.
 #
-# The failure is nasty because core is fine: it starts, it serves, and hc-web's
-# nginx dies at config load with `host not found in upstream "homecore"`,
-# restarts, and loops. Naming the network makes the stack behave the same
+# The failure is nasty because core is fine: it starts and serves, but the
+# app can't resolve `homecore` and every page fails to reach the API. Naming the network makes the stack behave the same
 # wherever it is deployed from.
 networks:
   homecore:
     driver: bridge
+
+volumes:
+  app-data:

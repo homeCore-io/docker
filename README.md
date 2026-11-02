@@ -3,10 +3,9 @@
 The images and compose files that run homeCore.
 
 ```
-browser ─▶ hc-web ─┬─ /            the Flutter web UI
-                   └─ /api/v1/* ──▶ hc-core ──▶ plugins (child processes)
-                                       │
-                                       └─ embedded MQTT broker
+browser ─▶ app :3001 ─┬─ /            the web app
+                      └─ /api/v1/* ──▶ hc-core ──▶ plugins (child processes)
+                                                  └─ embedded MQTT broker
 ```
 
 Two containers, and that is the whole stack.
@@ -14,7 +13,7 @@ Two containers, and that is the whole stack.
 | Image | What it is |
 |---|---|
 | `ghcr.io/homecore-io/hc-core` | The REST/WebSocket API and the embedded MQTT broker. No UI, no plugins. |
-| `ghcr.io/homecore-io/hc-web` | The Flutter web UI. nginx serves the app and reverse-proxies `/api/v1/*` to core. |
+| `ghcr.io/homecore-io/hc-web-svelte` | The web app — for the household and for running the house. Its server passes `/api/v1/*` and the event stream through to core, and keeps the app's own data (pages, layouts, displays) in its `/data` volume. |
 
 **Plugins are not containers.** Install them from the UI — Plugins → Add — and
 core downloads a signed artifact from the [plugin
@@ -40,15 +39,15 @@ docker compose up -d
 cat homecore-data/INITIAL_ADMIN_PASSWORD
 ```
 
-Open `http://<host-ip>:3000`, log in with `admin` and that password, then go to
-Plugins → Add and install what your hardware needs.
+Open `http://<host-ip>:3001`, log in with `admin` and that password, then go to
+Settings → Plugins → Add and install what your hardware needs.
 
 ### Deploying through a stack manager
 
 Dockhand, Portainer and anything else that hands the file to the engine rather
 than running `docker compose` will also work — but paste the file *whole*. The
 `networks:` block at the bottom of `compose.yml` is load-bearing when deployed
-this way, and dropping it produces the boot loop described under
+this way, and dropping it produces the failure described under
 [Troubleshooting](#troubleshooting).
 
 There is no repo to clone in that shape, which is deliberate: nothing in these
@@ -98,14 +97,14 @@ multicast traffic and the file will not do what it exists for.
 
 There is nothing to mount. The image seeds `config/homecore.toml` inside
 `homecore-data` on first boot, and the default is correct as shipped: core
-serves no UI (hc-web does), declares no plugins, and points at the signed
+serves no UI (the app does), declares no plugins, and points at the signed
 registry. Edit that file and `docker compose restart homecore`; it is yours
 after first boot and is never overwritten.
 
 ### Ports
 
-`HC_WEB_PORT` (default 3000) and `HC_API_PORT` (default 8080) move the stack off
-a busy host without editing a file:
+`HC_WEB_PORT` (default 3001) and `HC_API_PORT` (default 8080) move the stack
+off a busy host without editing a file:
 
 ```sh
 HC_WEB_PORT=8800 HC_API_PORT=8801 docker compose up -d
@@ -116,8 +115,8 @@ knowing before you change one:
 
 | | `compose.yml` / `compose-dev.yml` (bridge) | `compose.host.yml` (host) |
 |---|---|---|
-| `HC_WEB_PORT` | Published side of `HC_WEB_PORT:80`. nginx stays on 80 inside. | The port nginx itself binds, straight on the host. |
-| `HC_API_PORT` | Published side of `HC_API_PORT:8080`. Core stays on 8080 inside. | Tells nginx where core is. Core binds whatever `[server] port` says — set this to match. |
+| `HC_WEB_PORT` | Published side of `HC_WEB_PORT:3000`. The app stays on 3000 inside. | The port the app itself binds, straight on the host. |
+| `HC_API_PORT` | Published side of `HC_API_PORT:8080`. Core stays on 8080 inside. | Tells the app where core is. Core binds whatever `[server] port` says, so set this to match. |
 
 Host mode has no port mappings at all, so nothing gets remapped for you: if
 something else owns a port, move it here *and* in core's config.
@@ -138,6 +137,10 @@ Everything lives under the single bind-mount:
 ├── rules/                     automation rules, hot-reloaded
 └── logs/
 ```
+
+The app keeps its own data — pages, people's Homes and phone bars, displays,
+the house's look — in the `app-data` volume, not the bind-mount: homeCore's
+backup doesn't hold it. Settings → Data & backups in the app saves it to a file.
 
 ### File ownership
 
@@ -165,23 +168,18 @@ you genuinely mean it.
 Both of these were real, and both point away from themselves — which is the only
 reason they are worth a section.
 
-### hc-web restarts forever with `host not found in upstream "homecore"`
+### The app loads but can't reach homeCore
 
-Core is healthy; it starts, serves and logs nothing wrong. The half of the stack
-that is *not* broken is the half that dies.
+Core is healthy; it starts, serves and logs nothing wrong.
 
 The containers landed on Docker's default `bridge` network, which has no name
-resolution at all, so nginx could not resolve `homecore`. `docker compose up`
-creates a per-project network with embedded DNS and never shows this; a stack
-manager that hands the file to the engine can skip that step.
+resolution at all, so the app's server could not resolve `homecore` and every
+call it passes to the API fails. `docker compose up` creates a per-project
+network with embedded DNS and never shows this; a stack manager that hands the
+file to the engine can skip that step.
 
 **Fix:** use the `networks:` block at the bottom of `compose.yml`. If you pasted
 an excerpt into a stack manager, paste the whole file.
-
-Since hc-web 0.1.8 nginx also resolves its upstream per request rather than at
-config load, so an unreachable core is a `502` that recovers on its own instead
-of a container that exits. The named network is still what makes the name
-resolve in the first place.
 
 ### `cp: can't create '/homecore/config/homecore.toml/config.toml': Read-only file system`
 
@@ -193,11 +191,11 @@ clone. Deploy the same file without the repo and Docker helpfully created a
 image's own default, which is what the mount had been compensating for. If you
 are carrying a local copy of an older compose file, delete the mount.
 
-### The UI is unreachable but both containers are up
+### Nothing answers on port 3000
 
-Check what is actually published: `docker compose ps`. Through v0.1.9 the web
-mapping pointed at container port 3001 and nginx listens on 80, so the published
-port refused connections. Fixed in docker v0.1.10.
+The app is on 3001. Port 3000 was the old Flutter UI, which this stack no longer
+runs (see [What used to be here](#what-used-to-be-here)). Check what is actually
+published with `docker compose ps`.
 
 ### Discovery finds nothing
 
@@ -218,10 +216,10 @@ instead of discovering and receiving.
 | `:dev-<sha7>` | A specific develop build, immutable. Published by the same manual run. |
 
 **The three components version independently and their numbers do not agree.**
-core, hc-web and this repo are each tagged on their own cadence, so `hc-core`
-and `hc-web` are routinely several releases apart. Do not read a shared version
-into them. `git tag` here lists this repo's; the image tags above are core's and
-hc-web's own.
+core, the app and this repo are each tagged on their own cadence, so `hc-core`
+and `hc-web-svelte` are routinely several releases apart. Do not read a shared
+version into them. `git tag` here lists this repo's; the image tags above are
+core's and the app's own.
 
 To pin a whole stack, check this repo out at a tag and set both image versions
 in the compose file explicitly, rather than relying on `:latest` or on the
@@ -242,10 +240,16 @@ and core's tag alone reproduces its image. Core releases up to v0.1.13 were
 built the old way and still resolve the tags they used, so nothing historical
 breaks.
 
-hc-web builds its own image from `clients/hc-web/Dockerfile` and always did;
-nothing here was ever involved. Core works the same way now.
+The app builds its own image from the `Dockerfile` in its own repository
+(homeCore-io/hc-web-svelte); nothing here is involved. Core works the same way.
 
 ## What used to be here
+
+The **Flutter web UI** (`ghcr.io/homecore-io/hc-web`) was this stack's UI on
+port 3000, and for a while ran beside the app for hand-built dashboard pages.
+Core v0.1.94 removed the pages, themes and pictures it was built on, so it no
+longer works with a current core and the stack runs the app alone, on 3001. If
+your own compose file still has an `hc-web` service, delete it.
 
 An **appliance image** (`homecore-appliance`) baked core and every plugin into
 one container. It is retired — the stack above replaces it. Existing images
