@@ -84,6 +84,9 @@ services:
       # Where the app's server finds homeCore. `homecore` is the service name
       # above, so this resolves on the compose network.
       HC_CORE_URL: http://homecore:8080
+      # Live video from cameras (hc-reolink): go2rtc's address as the app
+      # reaches it. Left out, cameras show their snapshots.
+      # HC_GO2RTC_URL: http://go2rtc:1984
     networks: [homecore]
     ports:
       # The app listens on 3000 inside its container; the host gets 3001.
