@@ -58,12 +58,13 @@ services:
       # The API. Published so you can curl it directly; the app reaches it
       # over the compose network by service name either way.
       - "${HC_API_PORT:-8080}:8080"
-      # The embedded MQTT broker is deliberately NOT published. It binds
-      # loopback inside the container and core's plugins are children in the
-      # same network namespace, so nothing outside needs it. Publish 1883 only
-      # if LAN devices (Tasmota/Shelly/ESPHome) publish to it directly — and
-      # then set [broker] host = "0.0.0.0" plus [[broker.clients]] credentials,
-      # or core refuses to start rather than run an open broker.
+      # The embedded MQTT broker. Published, and inert until you open it: it
+      # binds loopback inside the container, so nothing reaches it through this
+      # mapping. Plugin runtimes (compose.runtime-python.yml) and LAN devices
+      # need it on the network: Settings › Plugins › Runtimes offers "Open the
+      # broker to the network", which sets [broker] host = "0.0.0.0" with
+      # logins and restarts core. Core refuses an open broker with no logins.
+      - "${HC_BROKER_PORT:-1883}:1883"
     networks: [homecore]
     volumes:
       - ./homecore-data:/homecore

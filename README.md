@@ -14,6 +14,7 @@ Two containers, and that is the whole stack.
 |---|---|
 | `ghcr.io/homecore-io/hc-core` | The REST/WebSocket API and the embedded MQTT broker. No UI, no plugins. |
 | `ghcr.io/homecore-io/hc-web-svelte` | The web app — for the household and for running the house. Its server passes `/api/v1/*` and the event stream through to core, and keeps the app's own data (pages, layouts, displays) in its `/data` volume. |
+| `ghcr.io/homecore-io/hc-runtime-python` | Optional. A plugin runtime for plugins written in Python, such as the Assistant. You run it beside the stack or on another machine; see [Plugin runtimes](#plugin-runtimes). |
 
 **Plugins are not containers.** Install them from the UI — Plugins → Add — and
 core downloads a signed artifact from the [plugin
@@ -60,6 +61,7 @@ files bind-mounts anything that only exists in a checkout.
 | `compose.yml` | bridge | **Start here.** |
 | `compose.host.yml` | host | You have Hue, Sonos, WLED, Roku or Ecowitt — or discovery found nothing. |
 | `compose-dev.yml` | bridge | You want the `:dev` tag, built from develop on request. |
+| `compose.runtime-python.yml` | bridge | Add-on, any machine: a runtime for Python plugins. |
 
 The distinction that matters is **discovery**. Hue, Sonos, WLED and Roku find
 devices over mDNS/SSDP, which is multicast — and a Docker bridge network does
@@ -152,16 +154,40 @@ Docker creates it root-owned, and the entrypoint chowns it to
 
 ### The MQTT broker
 
-Core embeds an MQTT broker on 1883. It is **not** published by default: it binds
-loopback, and plugins are children of core in the same network namespace, so
-nothing outside the container needs to reach it.
+Core embeds an MQTT broker on 1883. `compose.yml` publishes the port
+(`HC_BROKER_PORT`), but out of the box nothing answers on it: the broker binds
+loopback inside the container, where core's own plugins reach it as children
+in the same network namespace.
 
-Publish it only if LAN devices — Tasmota, Shelly, ESPHome — publish to it
-directly. That also means setting `[broker] host = "0.0.0.0"` and adding
-`[[broker.clients]]` credentials. Core refuses to start if you bind the broker
-to a non-loopback address with no clients configured, rather than quietly
-running an open broker; `HC_ALLOW_ANONYMOUS_REMOTE_BROKER=1` overrides that if
-you genuinely mean it.
+A plugin runtime, or a LAN device such as Tasmota, Shelly or ESPHome, needs the
+broker on the network. Settings › Plugins › Runtimes offers **Open the broker to
+the network**, which sets `[broker] host = "0.0.0.0"`, adds a login if there is
+none, and restarts core; every runtime and plugin then logs in with its own
+password. Core refuses to start if you bind the broker to a non-loopback
+address with no clients configured, rather than quietly running an open
+broker; `HC_ALLOW_ANONYMOUS_REMOTE_BROKER=1` overrides that if you genuinely
+mean it.
+
+## Plugin runtimes
+
+Plugins written in Python run in a runtime container instead of inside core.
+It holds any number of them, each in its own environment, and homeCore places
+plugins on it when you install them from the Catalog.
+
+```sh
+mkdir runtime-python-data
+docker compose -f compose.runtime-python.yml up -d
+```
+
+1. In homeCore, Settings › Plugins › Runtimes › **Add runtime** shows a
+   connection key once. Open the broker to the network there if it asks.
+2. Open `http://<runtime host>:8790`, paste the key and choose **Connect**. Or
+   set `HC_RUNTIME_KEY` in the compose file before starting it.
+
+The runtime can be on the same machine as the stack or a different one. It
+reaches homeCore at the address saved with the key and the broker on 1883 of
+the same host. The [runtime docs](https://homecore.io/docs/plugins/runtimes)
+cover the settings, Reset login and Remove.
 
 ## Troubleshooting
 
@@ -214,6 +240,10 @@ instead of discovering and receiving.
 | `:0.1.18` | A specific release, immutable. |
 | `:dev` | The develop branch, built **on request** — run `release.yml` from the Actions tab or `gh workflow run release.yml --ref develop`. Mutable, and only as fresh as the last such run. |
 | `:dev-<sha7>` | A specific develop build, immutable. Published by the same manual run. |
+
+`hc-runtime-python` is built from core's repository and released with core, so
+its version tags are core's: the runtime image tagged `0.1.110` is the one core
+v0.1.110 expects.
 
 **The three components version independently and their numbers do not agree.**
 core, the app and this repo are each tagged on their own cadence, so `hc-core`
