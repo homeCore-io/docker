@@ -40,6 +40,10 @@ services:
       # HC_RUNTIME_BROKER_HOST: 192.168.1.20
       # Shown in homeCore's runtime list.
       HC_RUNTIME_NETWORK_MODE: bridge
+      # homeCore's runtime list links to this runtime's page. On the same
+      # machine as homeCore that link just works; elsewhere, or with the page
+      # published on another port, say where it is.
+      # HC_RUNTIME_PAGE_URL: http://192.168.1.30:8790
     ports:
       # The runtime's own page: paste the key, see its plugins and logs.
       - "${HC_RUNTIME_PAGE_PORT:-8790}:8790"
