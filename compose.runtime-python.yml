@@ -1,0 +1,51 @@
+# =============================================================================
+# homeCore — a plugin runtime for Python plugins.
+#
+# A runtime is a container you run, on this machine or any other, that holds
+# homeCore plugins written in Python (the Assistant is one). homeCore never
+# starts or stops it, and it is not part of compose.yml: run it beside the stack
+# or somewhere else entirely.
+#
+# Setup:
+#
+#   1. In homeCore: Settings › Plugins › Runtimes › Add runtime. It shows a
+#      connection key once. If it also says runtimes can't reach the broker,
+#      choose "Open the broker to the network" (homeCore restarts).
+#   2. Here:
+#        mkdir runtime-python-data
+#        docker compose -f compose.runtime-python.yml up -d
+#   3. Open http://<this host>:8790, paste the key, choose Connect.
+#
+# Or skip the page: put the key in HC_RUNTIME_KEY below before step 2.
+#
+# The runtime reaches homeCore at the address the key holds (the one Add
+# runtime filled in) and the broker on port 1883 of the same host. compose.yml
+# publishes 1883 for this. Install Python plugins from the Catalog as usual;
+# homeCore places them here.
+#
+# Docs: https://homecore.io/docs/plugins/runtimes
+# =============================================================================
+
+services:
+  runtime-python:
+    image: ghcr.io/homecore-io/hc-runtime-python:latest
+    container_name: hc-runtime-python
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      # The connection key from Add runtime. Left unset, paste it on the page.
+      # HC_RUNTIME_KEY: hcrt1.…
+      # Only when the broker is somewhere other than the key's host, for
+      # example a broker published on another address.
+      # HC_RUNTIME_BROKER_HOST: 192.168.1.20
+      # Shown in homeCore's runtime list.
+      HC_RUNTIME_NETWORK_MODE: bridge
+    ports:
+      # The runtime's own page: paste the key, see its plugins and logs.
+      - "${HC_RUNTIME_PAGE_PORT:-8790}:8790"
+    volumes:
+      # The key and the installed plugins. Losing it costs nothing but pasting
+      # the key again; homeCore sends every plugin back. As with homecore-data,
+      # `mkdir runtime-python-data` as yourself is the whole setup: the
+      # entrypoint drops to the folder's owner.
+      - ./runtime-python-data:/var/lib/hc-runtime
