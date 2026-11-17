@@ -16,8 +16,8 @@ Two containers, and that is the whole stack.
 | `ghcr.io/homecore-io/hc-web-svelte` | The web app — for the household and for running the house. Its server passes `/api/v1/*` and the event stream through to core, and keeps the app's own data (pages, layouts, displays) in its `/data` volume. |
 | `ghcr.io/homecore-io/hc-runtime-python` | Optional. A plugin runtime for plugins written in Python, such as the Assistant. You run it beside the stack or on another machine; see [Plugin runtimes](#plugin-runtimes). |
 
-**Plugins are not containers.** Install them from the UI — Plugins → Add — and
-core downloads a signed artifact from the [plugin
+**Plugins are not containers.** Install them from the app's Catalog (Settings ›
+Plugins › Catalog) and core downloads a signed artifact from the [plugin
 registry](https://github.com/homeCore-io/registry), verifies its ed25519
 signature, and runs it as a child process. Adding hardware support never means
 editing a compose file.
@@ -41,7 +41,7 @@ cat homecore-data/INITIAL_ADMIN_PASSWORD
 ```
 
 Open `http://<host-ip>:3001`, log in with `admin` and that password, then go to
-Settings → Plugins → Add and install what your hardware needs.
+Settings › Plugins › Catalog and install what your hardware needs.
 
 ### Deploying through a stack manager
 
@@ -160,13 +160,13 @@ loopback inside the container, where core's own plugins reach it as children
 in the same network namespace.
 
 A plugin runtime, or a LAN device such as Tasmota, Shelly or ESPHome, needs the
-broker on the network. Settings › Plugins › Runtimes offers **Open the broker to
-the network**, which sets `[broker] host = "0.0.0.0"`, adds a login if there is
-none, and restarts core; every runtime and plugin then logs in with its own
-password. Core refuses to start if you bind the broker to a non-loopback
-address with no clients configured, rather than quietly running an open
-broker; `HC_ALLOW_ANONYMOUS_REMOTE_BROKER=1` overrides that if you genuinely
-mean it.
+broker on the network. The Plugin runtimes screen (a button on Settings ›
+Plugins) offers **Open the broker to the network**, which sets
+`[broker] host = "0.0.0.0"`, adds a login if there is none, and restarts core;
+every runtime and plugin then logs in with its own password. Core refuses to
+start if you bind the broker to a non-loopback address with no clients
+configured, rather than quietly running an open broker;
+`HC_ALLOW_ANONYMOUS_REMOTE_BROKER=1` overrides that if you genuinely mean it.
 
 ## Plugin runtimes
 
@@ -179,8 +179,8 @@ mkdir runtime-python-data
 docker compose -f compose.runtime-python.yml up -d
 ```
 
-1. In homeCore, Settings › Plugins › Runtimes › **Add runtime** shows a
-   connection key once. Open the broker to the network there if it asks.
+1. In homeCore, Settings › Plugins › Plugin runtimes › **Add runtime** shows
+   a connection key once. Open the broker to the network there if it asks.
 2. Open `http://<runtime host>:8790`, paste the key and choose **Connect**. Or
    set `HC_RUNTIME_KEY` in the compose file before starting it.
 

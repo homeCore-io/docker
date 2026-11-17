@@ -36,8 +36,8 @@ services:
       RUST_LOG: debug
     ports:
       - "${HC_API_PORT:-8080}:8080"
-      # The broker: inert until opened in Settings › Plugins › Runtimes. See
-      # compose.yml.
+      # The broker: inert until opened from Plugin runtimes (a button on
+      # Settings › Plugins). See compose.yml.
       - "${HC_BROKER_PORT:-1883}:1883"
     networks: [homecore-dev]
     volumes:
