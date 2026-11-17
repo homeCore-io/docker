@@ -8,9 +8,9 @@
 #
 # Setup:
 #
-#   1. In homeCore: Settings › Plugins › Runtimes › Add runtime. It shows a
-#      connection key once. If it also says runtimes can't reach the broker,
-#      choose "Open the broker to the network" (homeCore restarts).
+#   1. In homeCore: Settings › Plugins › Plugin runtimes › Add runtime. It
+#      shows a connection key once. If it also says runtimes can't reach the
+#      broker, choose "Open the broker to the network" (homeCore restarts).
 #   2. Here:
 #        mkdir runtime-python-data
 #        docker compose -f compose.runtime-python.yml up -d
@@ -20,8 +20,8 @@
 #
 # The runtime reaches homeCore at the address the key holds (the one Add
 # runtime filled in) and the broker on port 1883 of the same host. compose.yml
-# publishes 1883 for this. Install Python plugins from the Catalog as usual;
-# homeCore places them here.
+# publishes 1883 for this. Install Python plugins from the Catalog (Settings ›
+# Plugins › Catalog) as usual; homeCore places them here.
 #
 # Docs: https://homecore.io/docs/plugins/runtimes
 # =============================================================================

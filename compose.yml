@@ -13,9 +13,10 @@
 #              CORS headers), keeps sign-ins in httpOnly cookies, and stores
 #              the app's own data — pages, layouts, displays — in /data.
 #
-# Plugins are NOT containers. Install them from the UI (Plugins → Add) and core
-# pulls a signed artifact from the plugin registry, verifies it, and runs it as
-# a child process. Adding hardware support never means editing this file.
+# Plugins are NOT containers. Install them from the app's Catalog (Settings ›
+# Plugins › Catalog) and core pulls a signed artifact from the plugin registry,
+# verifies it, and runs it as a child process. Adding hardware support never
+# means editing this file.
 #
 #   browser ─▶ host:3001 ─▶ app:3000 ─┬─ /           the web app
 #                                     └─ /api/v1/* ─▶ homecore:8080
@@ -61,9 +62,10 @@ services:
       # The embedded MQTT broker. Published, and inert until you open it: it
       # binds loopback inside the container, so nothing reaches it through this
       # mapping. Plugin runtimes (compose.runtime-python.yml) and LAN devices
-      # need it on the network: Settings › Plugins › Runtimes offers "Open the
-      # broker to the network", which sets [broker] host = "0.0.0.0" with
-      # logins and restarts core. Core refuses an open broker with no logins.
+      # need it on the network: the Plugin runtimes screen (a button on
+      # Settings › Plugins) offers "Open the broker to the network", which sets
+      # [broker] host = "0.0.0.0" with logins and restarts core. Core refuses
+      # an open broker with no logins.
       - "${HC_BROKER_PORT:-1883}:1883"
     networks: [homecore]
     volumes:
