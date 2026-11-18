@@ -30,15 +30,27 @@ app. There is no supported shape where a browser talks to core directly.
 
 ## Quick start
 
-```sh
-git clone https://github.com/homeCore-io/docker.git homecore-docker
-cd homecore-docker
+Everything is in `compose.yml`. Download it and start it; there is nothing to
+clone:
 
-mkdir homecore-data          # as your user — see "File ownership" below
+```sh
+mkdir homecore && cd homecore
+curl -fsSLO https://raw.githubusercontent.com/homeCore-io/docker/main/compose.yml
+
+mkdir homecore-data          # as your user; see "File ownership" below
 docker compose up -d
 
 cat homecore-data/INITIAL_ADMIN_PASSWORD
 ```
+
+With Hue, Sonos, WLED, Roku or Ecowitt, download `compose.host.yml` as
+`compose.yml` instead (see [Which compose file](#which-compose-file)):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/homeCore-io/docker/main/compose.host.yml -o compose.yml
+```
+
+Cloning the repository works the same way, if you'd rather have every file.
 
 Open `http://<host-ip>:3001`, log in with `admin` and that password, then go to
 Settings › Plugins › Catalog and install what your hardware needs.
